@@ -9,13 +9,17 @@ import 'widgets/provider_request_card.dart';
 typedef _CategoryFilter = ({String key, String label, IconData icon, Color color});
 
 const _categoryFilters = <_CategoryFilter>[
-  (key: 'all', label: 'Tüm Kategoriler', icon: Icons.list_alt_outlined, color: Color(0xFF6B7280)),
-  (key: 'maintenance', label: 'Periyodik Bakım', icon: Icons.build_circle_outlined, color: Color(0xFF3B82F6)),
-  (key: 'engine', label: 'Motor & Mekanik', icon: Icons.settings_outlined, color: Color(0xFFD97706)),
-  (key: 'electrical', label: 'Elektrik & Elektronik', icon: Icons.bolt_outlined, color: Color(0xFFF59E0B)),
-  (key: 'body', label: 'Kaporta & Boya', icon: Icons.directions_car_outlined, color: Color(0xFF8B5CF6)),
-  (key: 'tire', label: 'Lastik & Jant', icon: Icons.tire_repair_outlined, color: Color(0xFF059669)),
-  (key: 'other', label: 'Diğer', icon: Icons.more_horiz_outlined, color: Color(0xFF6B7280)),
+  (key: 'all',      label: 'Tüm Kategoriler', icon: Icons.list_alt_outlined,              color: Color(0xFF6B7280)),
+  (key: 'motor',    label: 'Motor',            icon: Icons.local_fire_department_outlined, color: Color(0xFFDC2626)),
+  (key: 'elektrik', label: 'Elektrik',         icon: Icons.bolt_outlined,                 color: Color(0xFFCA8A04)),
+  (key: 'fren',     label: 'Fren',             icon: Icons.do_not_disturb_on_outlined,    color: Color(0xFFEA580C)),
+  (key: 'suspan',   label: 'Süspansiyon',      icon: Icons.tune_outlined,                 color: Color(0xFF2563EB)),
+  (key: 'kaporta',  label: 'Kaporta',          icon: Icons.brush_outlined,                color: Color(0xFF9333EA)),
+  (key: 'klima',    label: 'Klima',            icon: Icons.ac_unit_outlined,              color: Color(0xFF0891B2)),
+  (key: 'lastik',   label: 'Lastik',           icon: Icons.tire_repair_outlined,          color: Color(0xFF475569)),
+  (key: 'vites',    label: 'Vites',            icon: Icons.settings_outlined,             color: Color(0xFF4F46E5)),
+  (key: 'egzoz',    label: 'Egzoz',            icon: Icons.cloud_outlined,                color: Color(0xFF059669)),
+  (key: 'diger',    label: 'Diğer',            icon: Icons.help_outline,                  color: Color(0xFF6B7280)),
 ];
 
 class ProviderRequestsScreen extends ConsumerWidget {
