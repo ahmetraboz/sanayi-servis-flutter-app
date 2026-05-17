@@ -1,0 +1,340 @@
+import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../../core/theme/theme.dart';
+import '../../../shared/widgets/page_header.dart';
+import '../../../shared/widgets/shared_pagination.dart';
+import 'provider_open_requests_notifier.dart';
+import 'widgets/provider_request_card.dart';
+
+typedef _CategoryFilter = ({String key, String label, IconData icon, Color color});
+
+const _categoryFilters = <_CategoryFilter>[
+  (key: 'all', label: 'Tüm Kategoriler', icon: Icons.list_alt_outlined, color: Color(0xFF6B7280)),
+  (key: 'maintenance', label: 'Periyodik Bakım', icon: Icons.build_circle_outlined, color: Color(0xFF3B82F6)),
+  (key: 'engine', label: 'Motor & Mekanik', icon: Icons.settings_outlined, color: Color(0xFFD97706)),
+  (key: 'electrical', label: 'Elektrik & Elektronik', icon: Icons.bolt_outlined, color: Color(0xFFF59E0B)),
+  (key: 'body', label: 'Kaporta & Boya', icon: Icons.directions_car_outlined, color: Color(0xFF8B5CF6)),
+  (key: 'tire', label: 'Lastik & Jant', icon: Icons.tire_repair_outlined, color: Color(0xFF059669)),
+  (key: 'other', label: 'Diğer', icon: Icons.more_horiz_outlined, color: Color(0xFF6B7280)),
+];
+
+class ProviderRequestsScreen extends ConsumerWidget {
+  const ProviderRequestsScreen({super.key});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final state = ref.watch(providerOpenRequestsProvider);
+    final notifier = ref.read(providerOpenRequestsProvider.notifier);
+
+    return Scaffold(
+      backgroundColor: AppColors.gray50,
+      body: SafeArea(
+        bottom: false,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            PageHeader(
+              title: 'Açık Talepler',
+              action: state.total > 0
+                  ? Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFEFF6FF),
+                        borderRadius: BorderRadius.circular(20),
+                      ),
+                      child: Text(
+                        '${state.total} talep',
+                        style: const TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                          color: AppColors.primary700,
+                        ),
+                      ),
+                    )
+                  : null,
+            ),
+            _CategoryFilterPill(
+              activeCategory: state.activeCategory,
+              onChanged: notifier.onCategoryChanged,
+            ),
+          Expanded(
+            child: RefreshIndicator(
+              color: AppColors.primary600,
+              onRefresh: () => notifier.fetchRequests(page: 1),
+              child: _buildBody(state, notifier),
+            ),
+          ),
+          if (state.totalPages > 1)
+            SharedPagination(
+              currentPage: state.currentPage,
+              totalPages: state.totalPages,
+              total: state.total,
+              onPrevious: state.currentPage > 1 ? notifier.previousPage : null,
+              onNext: state.currentPage < state.totalPages ? notifier.nextPage : null,
+            ),
+        ],
+      ),
+    ),
+  );
+  }
+
+  Widget _buildBody(ProviderOpenRequestsState state, ProviderOpenRequestsNotifier notifier) {
+    if (state.loading && state.requests.isEmpty) {
+      return const Center(
+        child: CircularProgressIndicator(color: AppColors.primary600, strokeWidth: 2),
+      );
+    }
+
+    if (state.error != null && state.requests.isEmpty) {
+      return Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            const Icon(Icons.error_outline, size: 48, color: AppColors.gray300),
+            const SizedBox(height: 16),
+            Text(
+              state.error!,
+              style: const TextStyle(color: AppColors.gray500, fontSize: 14),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 16),
+            ElevatedButton(
+              onPressed: () => notifier.fetchRequests(page: 1),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.primary600,
+                foregroundColor: Colors.white,
+              ),
+              child: const Text('Tekrar Dene'),
+            ),
+          ],
+        ),
+      );
+    }
+
+    if (state.requests.isEmpty) {
+      return Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            const Icon(Icons.build_circle_outlined, size: 64, color: AppColors.gray300),
+            const SizedBox(height: 16),
+            Text(
+              state.activeCategory == 'all' ? 'Açık talep yok' : 'Bu kategoride talep bulunamadı',
+              style: const TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
+                color: AppColors.gray900,
+              ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              state.activeCategory == 'all'
+                  ? 'Şu an için size yönlendirilmiş açık servis talebi bulunmuyor.'
+                  : 'Farklı bir kategori filtresi deneyin.',
+              style: const TextStyle(color: AppColors.gray500, fontSize: 14),
+              textAlign: TextAlign.center,
+            ),
+          ],
+        ),
+      );
+    }
+
+    return Stack(
+      children: [
+        ListView.builder(
+          padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
+          itemCount: state.requests.length,
+          itemBuilder: (context, index) {
+            final request = state.requests[index] as Map<String, dynamic>;
+            return ProviderRequestCard(request: request);
+          },
+        ),
+        if (state.loading)
+          const Positioned(
+            top: 0,
+            left: 0,
+            right: 0,
+            child: LinearProgressIndicator(
+              color: AppColors.primary600,
+              backgroundColor: AppColors.gray100,
+              minHeight: 2,
+            ),
+          ),
+      ],
+    );
+  }
+}
+
+// ─── Filter Pill ──────────────────────────────────────────────────────────────
+
+class _CategoryFilterPill extends StatelessWidget {
+  final String activeCategory;
+  final void Function(String) onChanged;
+
+  const _CategoryFilterPill({required this.activeCategory, required this.onChanged});
+
+  _CategoryFilter get _active => _categoryFilters.firstWhere(
+        (f) => f.key == activeCategory,
+        orElse: () => _categoryFilters.first,
+      );
+
+  void _showSheet(BuildContext context) {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      isScrollControlled: true,
+      builder: (_) => _CategoryFilterSheet(
+        activeCategory: activeCategory,
+        onChanged: (val) {
+          Navigator.of(context).pop();
+          onChanged(val);
+        },
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final active = _active;
+    final isFiltered = activeCategory != 'all';
+
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.end,
+        children: [
+          if (isFiltered) ...[
+            GestureDetector(
+              onTap: () => onChanged('all'),
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 9),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(color: AppColors.gray200),
+                ),
+                child: const Icon(Icons.close_rounded, size: 16, color: AppColors.gray400),
+              ),
+            ),
+            const SizedBox(width: 8),
+          ],
+          GestureDetector(
+            onTap: () => _showSheet(context),
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 9),
+              decoration: BoxDecoration(
+                color: isFiltered ? active.color.withValues(alpha: 0.08) : Colors.white,
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(
+                  color: isFiltered ? active.color.withValues(alpha: 0.4) : AppColors.gray200,
+                ),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(Icons.tune_rounded, size: 16, color: isFiltered ? active.color : AppColors.gray500),
+                  const SizedBox(width: 6),
+                  Text(
+                    isFiltered ? active.label : 'Kategori',
+                    style: TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w500,
+                      color: isFiltered ? active.color : AppColors.gray600,
+                    ),
+                  ),
+                  const SizedBox(width: 4),
+                  Icon(Icons.keyboard_arrow_down_rounded, size: 16, color: isFiltered ? active.color : AppColors.gray400),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _CategoryFilterSheet extends StatelessWidget {
+  final String activeCategory;
+  final void Function(String) onChanged;
+
+  const _CategoryFilterSheet({required this.activeCategory, required this.onChanged});
+
+  @override
+  Widget build(BuildContext context) {
+    final bottomPad = MediaQuery.of(context).padding.bottom;
+    return Container(
+      decoration: const BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      constraints: BoxConstraints(maxHeight: MediaQuery.of(context).size.height * 0.75),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const SizedBox(height: 12),
+          Container(
+            width: 36,
+            height: 4,
+            decoration: BoxDecoration(color: AppColors.gray200, borderRadius: BorderRadius.circular(99)),
+          ),
+          const SizedBox(height: 20),
+          const Padding(
+            padding: EdgeInsets.symmetric(horizontal: 20),
+            child: Align(
+              alignment: Alignment.centerLeft,
+              child: Text(
+                'Kategori Filtrele',
+                style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: AppColors.gray900),
+              ),
+            ),
+          ),
+          const SizedBox(height: 12),
+          Flexible(
+            child: SingleChildScrollView(
+              child: Column(
+                children: [
+                  ..._categoryFilters.map((f) {
+                    final isActive = activeCategory == f.key;
+                    return InkWell(
+                      onTap: () => onChanged(f.key),
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
+                        child: Row(
+                          children: [
+                            Container(
+                              width: 36,
+                              height: 36,
+                              decoration: BoxDecoration(
+                                color: f.color.withValues(alpha: 0.1),
+                                borderRadius: BorderRadius.circular(10),
+                              ),
+                              child: Icon(f.icon, size: 18, color: f.color),
+                            ),
+                            const SizedBox(width: 14),
+                            Expanded(
+                              child: Text(
+                                f.label,
+                                style: TextStyle(
+                                  fontSize: 15,
+                                  fontWeight: isActive ? FontWeight.w600 : FontWeight.w400,
+                                  color: isActive ? f.color : AppColors.gray700,
+                                ),
+                              ),
+                            ),
+                            if (isActive) Icon(Icons.check_rounded, size: 18, color: f.color),
+                          ],
+                        ),
+                      ),
+                    );
+                  }),
+                  SizedBox(height: bottomPad + 16),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
