@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:latlong2/latlong.dart';
 import '../../../shared/widgets/skeleton.dart';
 import '../../../core/api/api_client.dart';
@@ -22,76 +23,14 @@ class ProviderProfileScreen extends ConsumerStatefulWidget {
 }
 
 class _ProviderProfileScreenState extends ConsumerState<ProviderProfileScreen> {
-  bool _editing = false;
-
-  late final TextEditingController _companyNameCtrl;
-  late final TextEditingController _taxNumberCtrl;
-  late final TextEditingController _addressCtrl;
-  late final TextEditingController _cityCtrl;
-  late final TextEditingController _districtCtrl;
-  late final TextEditingController _descriptionCtrl;
-
-  @override
-  void initState() {
-    super.initState();
-    _companyNameCtrl = TextEditingController();
-    _taxNumberCtrl = TextEditingController();
-    _addressCtrl = TextEditingController();
-    _cityCtrl = TextEditingController();
-    _districtCtrl = TextEditingController();
-    _descriptionCtrl = TextEditingController();
-  }
-
-  @override
-  void dispose() {
-    _companyNameCtrl.dispose();
-    _taxNumberCtrl.dispose();
-    _addressCtrl.dispose();
-    _cityCtrl.dispose();
-    _districtCtrl.dispose();
-    _descriptionCtrl.dispose();
-    super.dispose();
-  }
-
-  void _populateControllers(Map<String, dynamic> profile) {
-    _companyNameCtrl.text = profile['companyName'] as String? ?? '';
-    _taxNumberCtrl.text = profile['taxNumber'] as String? ?? '';
-    _addressCtrl.text = profile['address'] as String? ?? '';
-    _cityCtrl.text = profile['city'] as String? ?? '';
-    _districtCtrl.text = profile['district'] as String? ?? '';
-    _descriptionCtrl.text = profile['description'] as String? ?? '';
-  }
-
-  void _startEditing(Map<String, dynamic> profile) {
-    _populateControllers(profile);
-    setState(() => _editing = true);
-  }
-
-  void _cancelEditing(Map<String, dynamic> profile) {
-    _populateControllers(profile);
-    setState(() => _editing = false);
-  }
-
-  Future<void> _saveProfile() async {
-    final notifier = ref.read(providerProfileProvider.notifier);
-    final ok = await notifier.saveProfile({
-      'companyName': _companyNameCtrl.text.trim(),
-      'taxNumber': _taxNumberCtrl.text.trim(),
-      'address': _addressCtrl.text.trim(),
-      'city': _cityCtrl.text.trim(),
-      'district': _districtCtrl.text.trim(),
-      'description': _descriptionCtrl.text.trim(),
-    });
-    if (ok && mounted) {
-      setState(() => _editing = false);
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('İşletme profiliniz güncellendi'),
-          backgroundColor: AppColors.blue600,
-          behavior: SnackBarBehavior.floating,
-        ),
-      );
-    }
+  void _openEditSheet(BuildContext context, Map<String, dynamic> profile) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      useSafeArea: true,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) => _ProfileEditSheet(profile: profile),
+    );
   }
 
   @override
@@ -167,25 +106,10 @@ class _ProviderProfileScreenState extends ConsumerState<ProviderProfileScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            _CompanyBanner(profile: profile, onEditTap: () => _startEditing(profile)),
+            _CompanyBanner(profile: profile, onEditTap: () => _openEditSheet(context, profile)),
             const SizedBox(height: 16),
             _ApprovalBanner(status: state.approvalStatus ?? 'pending'),
             const SizedBox(height: 16),
-
-            if (state.saveError != null) ...[
-              Container(
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(color: AppColors.red50, borderRadius: BorderRadius.circular(12), border: Border.all(color: AppColors.red100)),
-                child: Row(
-                  children: [
-                    const Icon(Icons.error_outline, size: 18, color: AppColors.red700),
-                    const SizedBox(width: 8),
-                    Expanded(child: Text(state.saveError!, style: const TextStyle(fontSize: 13, color: AppColors.red700))),
-                  ],
-                ),
-              ),
-              const SizedBox(height: 12),
-            ],
 
             _NavRow(
               icon: Icons.notifications_outlined,
@@ -208,21 +132,9 @@ class _ProviderProfileScreenState extends ConsumerState<ProviderProfileScreen> {
             const SizedBox(height: 16),
             _MapCard(profile: profile),
             const SizedBox(height: 12),
-            if (_editing)
-              _EditForm(
-                companyNameCtrl: _companyNameCtrl,
-                taxNumberCtrl: _taxNumberCtrl,
-                addressCtrl: _addressCtrl,
-                cityCtrl: _cityCtrl,
-                districtCtrl: _districtCtrl,
-                descriptionCtrl: _descriptionCtrl,
-                saving: state.saving,
-                onSave: _saveProfile,
-                onCancel: () => _cancelEditing(profile),
-              )
-            else
-              _InfoView(profile: profile),
-
+            _PhotosCard(photos: state.photos),
+            const SizedBox(height: 12),
+            _InfoView(profile: profile),
             const SizedBox(height: 24),
           ],
         ),
@@ -254,6 +166,127 @@ class _ProviderProfileScreenState extends ConsumerState<ProviderProfileScreen> {
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
             ),
             child: const Text('Çıkış Yap'),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ─── Photos Card ─────────────────────────────────────────────────────────────
+
+class _PhotosCard extends StatelessWidget {
+  final List<String> photos;
+
+  const _PhotosCard({required this.photos});
+
+  @override
+  Widget build(BuildContext context) {
+    if (photos.isEmpty) return const SizedBox.shrink();
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: AppColors.gray200),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Padding(
+            padding: EdgeInsets.fromLTRB(16, 14, 16, 0),
+            child: Row(
+              children: [
+                Icon(Icons.photo_library_outlined, size: 16, color: AppColors.blue600),
+                SizedBox(width: 8),
+                Text('İşletme Fotoğrafları', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 14, color: AppColors.gray900)),
+              ],
+            ),
+          ),
+          const Divider(height: 20, indent: 16, endIndent: 16),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+            child: SizedBox(
+              height: 88,
+              child: ListView.separated(
+                scrollDirection: Axis.horizontal,
+                itemCount: photos.length,
+                separatorBuilder: (context, index) => const SizedBox(width: 8),
+                itemBuilder: (context, i) => ClipRRect(
+                  borderRadius: BorderRadius.circular(10),
+                  child: CachedNetworkImage(
+                    imageUrl: photos[i],
+                    width: 88,
+                    height: 88,
+                    fit: BoxFit.cover,
+                    placeholder: (context, url) => Container(width: 88, height: 88, color: AppColors.gray100),
+                    errorWidget: (context, url, error) => Container(width: 88, height: 88, color: AppColors.gray100, child: const Icon(Icons.broken_image_outlined, color: AppColors.gray300)),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _PhotoThumb extends StatelessWidget {
+  final String url;
+  final VoidCallback onRemove;
+
+  const _PhotoThumb({required this.url, required this.onRemove});
+
+  @override
+  Widget build(BuildContext context) {
+    return Stack(
+      children: [
+        ClipRRect(
+          borderRadius: BorderRadius.circular(10),
+          child: CachedNetworkImage(
+            imageUrl: url,
+            width: 88,
+            height: 88,
+            fit: BoxFit.cover,
+            placeholder: (context, url2) => Container(width: 88, height: 88, color: AppColors.gray100),
+            errorWidget: (context, url2, error) => Container(
+              width: 88,
+              height: 88,
+              color: AppColors.gray100,
+              child: const Icon(Icons.broken_image_outlined, color: AppColors.gray300),
+            ),
+          ),
+        ),
+        Positioned(
+          top: 4,
+          right: 4,
+          child: GestureDetector(
+            onTap: () => _confirmRemove(context),
+            child: Container(
+              width: 22,
+              height: 22,
+              decoration: const BoxDecoration(color: Colors.black54, shape: BoxShape.circle),
+              child: const Icon(Icons.close, size: 14, color: Colors.white),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  void _confirmRemove(BuildContext context) {
+    showDialog(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+        title: const Text('Fotoğrafı Sil', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
+        content: const Text('Bu fotoğraf silinecek. Emin misiniz?', style: TextStyle(fontSize: 14, color: AppColors.gray600)),
+        actions: [
+          TextButton(onPressed: () => Navigator.of(dialogContext).pop(), child: const Text('İptal', style: TextStyle(color: AppColors.gray500))),
+          ElevatedButton(
+            onPressed: () { Navigator.of(dialogContext).pop(); onRemove(); },
+            style: ElevatedButton.styleFrom(backgroundColor: AppColors.red700, foregroundColor: Colors.white, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8))),
+            child: const Text('Sil'),
           ),
         ],
       ),
@@ -751,98 +784,254 @@ class _InfoView extends StatelessWidget {
   }
 }
 
-// ─── Edit Form ────────────────────────────────────────────────────────────────
+// ─── Profile Edit Sheet ───────────────────────────────────────────────────────
 
-class _EditForm extends StatelessWidget {
-  final TextEditingController companyNameCtrl;
-  final TextEditingController taxNumberCtrl;
-  final TextEditingController addressCtrl;
-  final TextEditingController cityCtrl;
-  final TextEditingController districtCtrl;
-  final TextEditingController descriptionCtrl;
-  final bool saving;
-  final VoidCallback onSave;
-  final VoidCallback onCancel;
+class _ProfileEditSheet extends ConsumerStatefulWidget {
+  final Map<String, dynamic> profile;
 
-  const _EditForm({
-    required this.companyNameCtrl,
-    required this.taxNumberCtrl,
-    required this.addressCtrl,
-    required this.cityCtrl,
-    required this.districtCtrl,
-    required this.descriptionCtrl,
-    required this.saving,
-    required this.onSave,
-    required this.onCancel,
-  });
+  const _ProfileEditSheet({required this.profile});
+
+  @override
+  ConsumerState<_ProfileEditSheet> createState() => _ProfileEditSheetState();
+}
+
+class _ProfileEditSheetState extends ConsumerState<_ProfileEditSheet> {
+  late final TextEditingController _companyNameCtrl;
+  late final TextEditingController _taxNumberCtrl;
+  late final TextEditingController _addressCtrl;
+  late final TextEditingController _cityCtrl;
+  late final TextEditingController _districtCtrl;
+  late final TextEditingController _descriptionCtrl;
+
+  @override
+  void initState() {
+    super.initState();
+    final p = widget.profile;
+    _companyNameCtrl = TextEditingController(text: p['companyName'] as String? ?? '');
+    _taxNumberCtrl   = TextEditingController(text: p['taxNumber']   as String? ?? '');
+    _addressCtrl     = TextEditingController(text: p['address']     as String? ?? '');
+    _cityCtrl        = TextEditingController(text: p['city']        as String? ?? '');
+    _districtCtrl    = TextEditingController(text: p['district']    as String? ?? '');
+    _descriptionCtrl = TextEditingController(text: p['description'] as String? ?? '');
+  }
+
+  @override
+  void dispose() {
+    _companyNameCtrl.dispose();
+    _taxNumberCtrl.dispose();
+    _addressCtrl.dispose();
+    _cityCtrl.dispose();
+    _districtCtrl.dispose();
+    _descriptionCtrl.dispose();
+    super.dispose();
+  }
+
+  Future<void> _save() async {
+    final ok = await ref.read(providerProfileProvider.notifier).saveProfile({
+      'companyName': _companyNameCtrl.text.trim(),
+      'taxNumber':   _taxNumberCtrl.text.trim(),
+      'address':     _addressCtrl.text.trim(),
+      'city':        _cityCtrl.text.trim(),
+      'district':    _districtCtrl.text.trim(),
+      'description': _descriptionCtrl.text.trim(),
+    });
+    if (ok && mounted) {
+      Navigator.of(context).pop();
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('İşletme profiliniz güncellendi'),
+          backgroundColor: AppColors.blue600,
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    }
+  }
+
+  Future<void> _pickAndUpload() async {
+    final source = await _showSourceSheet(context);
+    if (source == null || !mounted) return;
+    final picked = await ImagePicker().pickImage(source: source, imageQuality: 85, maxWidth: 1920);
+    if (picked == null || !mounted) return;
+    await ref.read(providerProfileProvider.notifier).uploadPhoto(File(picked.path));
+  }
+
+  Future<ImageSource?> _showSourceSheet(BuildContext context) {
+    return showModalBottomSheet<ImageSource>(
+      context: context,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) => Container(
+        decoration: const BoxDecoration(color: Colors.white, borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
+        padding: const EdgeInsets.fromLTRB(20, 16, 20, 32),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(width: 36, height: 4, decoration: BoxDecoration(color: AppColors.gray200, borderRadius: BorderRadius.circular(99))),
+            const SizedBox(height: 20),
+            const Align(alignment: Alignment.centerLeft, child: Text('Fotoğraf Ekle', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: AppColors.gray900))),
+            const SizedBox(height: 12),
+            ListTile(
+              leading: Container(width: 40, height: 40, decoration: BoxDecoration(color: AppColors.blue600.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(10)), child: const Icon(Icons.photo_library_outlined, color: AppColors.blue600)),
+              title: const Text('Galeriden Seç', style: TextStyle(fontWeight: FontWeight.w500)),
+              onTap: () => Navigator.of(ctx).pop(ImageSource.gallery),
+            ),
+            ListTile(
+              leading: Container(width: 40, height: 40, decoration: BoxDecoration(color: AppColors.primary600.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(10)), child: const Icon(Icons.camera_alt_outlined, color: AppColors.primary600)),
+              title: const Text('Kamera', style: TextStyle(fontWeight: FontWeight.w500)),
+              onTap: () => Navigator.of(ctx).pop(ImageSource.camera),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
+    final sheetState = ref.watch(providerProfileProvider);
+    final saving = sheetState.saving;
+    final uploading = sheetState.uploadingPhoto;
+    final photos = sheetState.photos;
+    final bottom = MediaQuery.of(context).viewInsets.bottom;
+    final screenHeight = MediaQuery.of(context).size.height;
+
     return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
+      constraints: BoxConstraints(maxHeight: screenHeight * 0.92),
+      decoration: const BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: AppColors.blue600.withValues(alpha: 0.3)),
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
       child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
         children: [
-          const Row(
-            children: [
-              Icon(Icons.edit_outlined, size: 16, color: AppColors.blue600),
-              SizedBox(width: 8),
-              Text('Bilgileri Düzenle', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 14, color: AppColors.gray900)),
-            ],
-          ),
-          const SizedBox(height: 16),
-          _Field(label: 'Firma Adı *', ctrl: companyNameCtrl, icon: Icons.storefront_outlined),
-          const SizedBox(height: 12),
-          _Field(label: 'Vergi Numarası', ctrl: taxNumberCtrl, icon: Icons.badge_outlined, keyboard: TextInputType.number),
-          const SizedBox(height: 12),
-          _Field(label: 'Adres', ctrl: addressCtrl, icon: Icons.location_on_outlined),
-          const SizedBox(height: 12),
-          Row(
-            children: [
-              Expanded(child: _Field(label: 'İl', ctrl: cityCtrl, icon: Icons.map_outlined)),
-              const SizedBox(width: 10),
-              Expanded(child: _Field(label: 'İlçe', ctrl: districtCtrl, icon: Icons.map_outlined)),
-            ],
-          ),
-          const SizedBox(height: 12),
-          _Field(label: 'İşletme Açıklaması', ctrl: descriptionCtrl, icon: Icons.description_outlined, maxLines: 4),
-          const SizedBox(height: 20),
-          Row(
-            children: [
-              Expanded(
-                child: OutlinedButton(
-                  onPressed: saving ? null : onCancel,
-                  style: OutlinedButton.styleFrom(
-                    foregroundColor: AppColors.gray600,
-                    side: const BorderSide(color: AppColors.gray300),
-                    padding: const EdgeInsets.symmetric(vertical: 12),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                  ),
-                  child: const Text('İptal'),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(20, 16, 20, 0),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Center(child: Container(width: 36, height: 4, decoration: BoxDecoration(color: AppColors.gray200, borderRadius: BorderRadius.circular(99)))),
+                const SizedBox(height: 16),
+                const Row(
+                  children: [
+                    Icon(Icons.edit_outlined, size: 16, color: AppColors.blue600),
+                    SizedBox(width: 8),
+                    Text('Profili Düzenle', style: TextStyle(fontSize: 17, fontWeight: FontWeight.w700, color: AppColors.gray900)),
+                  ],
                 ),
+                const SizedBox(height: 4),
+              ],
+            ),
+          ),
+          const Divider(height: 16),
+          Flexible(
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.symmetric(horizontal: 20),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // ── Fotoğraflar ──────────────────────────────────────
+                  Row(
+                    children: [
+                      const Icon(Icons.photo_library_outlined, size: 14, color: AppColors.gray500),
+                      const SizedBox(width: 6),
+                      const Text('İşletme Fotoğrafları', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: AppColors.gray700)),
+                      const Spacer(),
+                      GestureDetector(
+                        onTap: uploading ? null : _pickAndUpload,
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                          decoration: BoxDecoration(color: AppColors.blue600.withValues(alpha: 0.08), borderRadius: BorderRadius.circular(8)),
+                          child: uploading
+                              ? const SizedBox(width: 14, height: 14, child: CircularProgressIndicator(strokeWidth: 2, color: AppColors.blue600))
+                              : const Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Icon(Icons.add, size: 14, color: AppColors.blue600),
+                                    SizedBox(width: 4),
+                                    Text('Ekle', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: AppColors.blue600)),
+                                  ],
+                                ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 10),
+                  if (photos.isEmpty)
+                    Container(
+                      height: 80,
+                      decoration: BoxDecoration(color: AppColors.gray50, borderRadius: BorderRadius.circular(10), border: Border.all(color: AppColors.gray200)),
+                      child: const Center(child: Text('Henüz fotoğraf eklenmemiş', style: TextStyle(fontSize: 13, color: AppColors.gray400))),
+                    )
+                  else
+                    SizedBox(
+                      height: 88,
+                      child: ListView.separated(
+                        scrollDirection: Axis.horizontal,
+                        itemCount: photos.length,
+                        separatorBuilder: (context, index) => const SizedBox(width: 8),
+                        itemBuilder: (context, i) => _PhotoThumb(
+                          url: photos[i],
+                          onRemove: () => ref.read(providerProfileProvider.notifier).removePhoto(photos[i]),
+                        ),
+                      ),
+                    ),
+                  const SizedBox(height: 20),
+                  const Divider(),
+                  const SizedBox(height: 16),
+                  // ── Form alanları ────────────────────────────────────
+                  _Field(label: 'Firma Adı *', ctrl: _companyNameCtrl, icon: Icons.storefront_outlined),
+                  const SizedBox(height: 12),
+                  _Field(label: 'Vergi Numarası', ctrl: _taxNumberCtrl, icon: Icons.badge_outlined, keyboard: TextInputType.number),
+                  const SizedBox(height: 12),
+                  _Field(label: 'Adres', ctrl: _addressCtrl, icon: Icons.location_on_outlined),
+                  const SizedBox(height: 12),
+                  Row(
+                    children: [
+                      Expanded(child: _Field(label: 'İl', ctrl: _cityCtrl, icon: Icons.map_outlined)),
+                      const SizedBox(width: 10),
+                      Expanded(child: _Field(label: 'İlçe', ctrl: _districtCtrl, icon: Icons.map_outlined)),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+                  _Field(label: 'İşletme Açıklaması', ctrl: _descriptionCtrl, icon: Icons.description_outlined, maxLines: 4),
+                  const SizedBox(height: 8),
+                ],
               ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: ElevatedButton.icon(
-                  onPressed: saving ? null : onSave,
-                  icon: saving
-                      ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
-                      : const Icon(Icons.check, size: 18),
-                  label: Text(saving ? 'Kaydediliyor...' : 'Kaydet'),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: AppColors.blue600,
-                    foregroundColor: Colors.white,
-                    padding: const EdgeInsets.symmetric(vertical: 12),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+            ),
+          ),
+          Padding(
+            padding: EdgeInsets.fromLTRB(20, 12, 20, 20 + bottom),
+            child: Row(
+              children: [
+                Expanded(
+                  child: OutlinedButton(
+                    onPressed: saving ? null : () => Navigator.of(context).pop(),
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: AppColors.gray600,
+                      side: const BorderSide(color: AppColors.gray300),
+                      padding: const EdgeInsets.symmetric(vertical: 14),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                    ),
+                    child: const Text('İptal'),
                   ),
                 ),
-              ),
-            ],
+                const SizedBox(width: 12),
+                Expanded(
+                  flex: 2,
+                  child: ElevatedButton(
+                    onPressed: saving ? null : _save,
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppColors.blue600,
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(vertical: 14),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                    ),
+                    child: saving
+                        ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                        : const Text('Kaydet', style: TextStyle(fontWeight: FontWeight.w600)),
+                  ),
+                ),
+              ],
+            ),
           ),
         ],
       ),

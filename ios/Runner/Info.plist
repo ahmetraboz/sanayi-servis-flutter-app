@@ -52,6 +52,12 @@
 			</array>
 		</dict>
 	</dict>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>İşletme fotoğraflarınızı yüklemek için galeri erişimi gerekiyor.</string>
+	<key>NSCameraUsageDescription</key>
+	<string>İşletme fotoğrafı çekmek için kamera erişimi gerekiyor.</string>
+	<key>NSPhotoLibraryAddUsageDescription</key>
+	<string>Fotoğraf kaydetmek için galeri erişimi gerekiyor.</string>
 	<key>UIApplicationSupportsIndirectInputEvents</key>
 	<true/>
 	<key>UILaunchStoryboardName</key>

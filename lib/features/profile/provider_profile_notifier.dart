@@ -1,3 +1,6 @@
+import 'dart:convert';
+import 'dart:io';
+
 import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/api/api_client.dart';
@@ -11,6 +14,7 @@ class ProviderProfileState {
   final bool saving;
   final String? saveError;
   final bool saveSuccess;
+  final bool uploadingPhoto;
 
   const ProviderProfileState({
     this.loading = true,
@@ -19,6 +23,7 @@ class ProviderProfileState {
     this.saving = false,
     this.saveError,
     this.saveSuccess = false,
+    this.uploadingPhoto = false,
   });
 
   ProviderProfileState copyWith({
@@ -28,6 +33,7 @@ class ProviderProfileState {
     bool? saving,
     Object? saveError = _sentinel,
     bool? saveSuccess,
+    bool? uploadingPhoto,
   }) {
     return ProviderProfileState(
       loading: loading ?? this.loading,
@@ -36,10 +42,21 @@ class ProviderProfileState {
       saving: saving ?? this.saving,
       saveError: identical(saveError, _sentinel) ? this.saveError : saveError as String?,
       saveSuccess: saveSuccess ?? this.saveSuccess,
+      uploadingPhoto: uploadingPhoto ?? this.uploadingPhoto,
     );
   }
 
   String? get approvalStatus => profile?['approvalStatus'] as String? ?? profile?['status'] as String?;
+
+  List<String> get photos {
+    final raw = profile?['photos'] as String?;
+    if (raw == null || raw.isEmpty) return [];
+    try {
+      return (jsonDecode(raw) as List).cast<String>();
+    } catch (_) {
+      return [];
+    }
+  }
 }
 
 class ProviderProfileNotifier extends StateNotifier<ProviderProfileState> {
@@ -72,6 +89,31 @@ class ProviderProfileNotifier extends StateNotifier<ProviderProfileState> {
       state = state.copyWith(saving: false, saveError: e.message ?? 'Profil kaydedilemedi');
       return false;
     }
+  }
+
+  Future<String?> uploadPhoto(File file) async {
+    state = state.copyWith(uploadingPhoto: true);
+    try {
+      final formData = FormData.fromMap({
+        'file': await MultipartFile.fromFile(file.path, filename: file.path.split('/').last),
+      });
+      final res = await _api.postFormData('/api/upload', formData);
+      final url = (res.data as Map<String, dynamic>)['url'] as String;
+      final updated = [...state.photos, url];
+      await _api.put('/api/service-profile', data: {'photos': jsonEncode(updated)});
+      state = state.copyWith(uploadingPhoto: false);
+      await loadProfile();
+      return url;
+    } on DioException catch (_) {
+      state = state.copyWith(uploadingPhoto: false);
+      return null;
+    }
+  }
+
+  Future<void> removePhoto(String url) async {
+    final updated = state.photos.where((p) => p != url).toList();
+    await _api.put('/api/service-profile', data: {'photos': jsonEncode(updated)});
+    await loadProfile();
   }
 }
 
