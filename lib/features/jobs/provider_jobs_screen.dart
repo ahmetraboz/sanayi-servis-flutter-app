@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../../core/theme/theme.dart';
 import '../../../shared/widgets/page_header.dart';
+import '../../../shared/widgets/skeleton.dart';
 import 'provider_jobs_notifier.dart';
 
 class ProviderJobsScreen extends ConsumerWidget {
@@ -35,7 +36,7 @@ class ProviderJobsScreen extends ConsumerWidget {
 
   Widget _buildBody(BuildContext context, ProviderJobsState state) {
     if (state.loading) {
-      return const Center(child: CircularProgressIndicator(color: AppColors.blue600, strokeWidth: 2));
+      return const _JobListSkeleton();
     }
 
     if (state.error != null) {
@@ -442,6 +443,52 @@ class _StatusBadge extends StatelessWidget {
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
       decoration: BoxDecoration(color: bg, borderRadius: BorderRadius.circular(6)),
       child: Text(label, style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: color)),
+    );
+  }
+}
+
+class _JobListSkeleton extends StatelessWidget {
+  const _JobListSkeleton();
+
+  @override
+  Widget build(BuildContext context) {
+    return ListView.builder(
+      padding: const EdgeInsets.all(16),
+      itemCount: 5,
+      itemBuilder: (context, index) => Container(
+        margin: const EdgeInsets.only(bottom: 12),
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: AppColors.gray200),
+        ),
+        child: const Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                SkeletonBox(height: 40, width: 40, radius: 10),
+                SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      SkeletonBox(height: 15, radius: 5),
+                      SizedBox(height: 8),
+                      SkeletonBox(height: 12, width: 140, radius: 4),
+                    ],
+                  ),
+                ),
+                SizedBox(width: 12),
+                SkeletonBox(height: 24, width: 80, radius: 20),
+              ],
+            ),
+            SizedBox(height: 12),
+            SkeletonBox(height: 12, width: 200, radius: 4),
+          ],
+        ),
+      ),
     );
   }
 }

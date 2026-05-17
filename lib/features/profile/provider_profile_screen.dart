@@ -1,7 +1,13 @@
+import 'dart:convert';
+import 'dart:io';
+
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_map/flutter_map.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:latlong2/latlong.dart';
+import '../../../shared/widgets/skeleton.dart';
 import '../../../core/api/api_client.dart';
 import '../../../core/auth/auth_notifier.dart';
 import '../../../core/theme/theme.dart';
@@ -129,7 +135,7 @@ class _ProviderProfileScreenState extends ConsumerState<ProviderProfileScreen> {
 
   Widget _buildBody(ProviderProfileState state) {
     if (state.loading && state.profile == null) {
-      return const Center(child: CircularProgressIndicator(color: AppColors.blue600, strokeWidth: 2));
+      return const _ProfileSkeleton();
     }
 
     if (state.error != null && state.profile == null) {
@@ -181,6 +187,27 @@ class _ProviderProfileScreenState extends ConsumerState<ProviderProfileScreen> {
               const SizedBox(height: 12),
             ],
 
+            _NavRow(
+              icon: Icons.notifications_outlined,
+              label: 'Bildirimler',
+              color: AppColors.blue600,
+              subtitle: 'Tüm bildirimleriniz',
+              onTap: () => context.push('/provider/notifications'),
+            ),
+            const SizedBox(height: 10),
+            _NavRow(
+              icon: Icons.star_outline_rounded,
+              label: 'Puanlamalarım',
+              color: const Color(0xFFCA8A04),
+              subtitle: state.profile?['averageRating'] != null
+                  ? '${state.profile!['averageRating']} ★'
+                  : 'Müşteri değerlendirmeleri',
+              onTap: () => context.push('/provider/reviews'),
+            ),
+
+            const SizedBox(height: 16),
+            _MapCard(profile: profile),
+            const SizedBox(height: 12),
             if (_editing)
               _EditForm(
                 companyNameCtrl: _companyNameCtrl,
@@ -273,7 +300,7 @@ class _CompanyBanner extends ConsumerWidget {
                 height: 140,
                 width: double.infinity,
                 fit: BoxFit.cover,
-                errorWidget: (_, __, _e) => const SizedBox.shrink(),
+                errorWidget: (ctx, url, err) => const SizedBox.shrink(),
               ),
             ),
           Padding(
@@ -293,7 +320,7 @@ class _CompanyBanner extends ConsumerWidget {
                           child: CachedNetworkImage(
                             imageUrl: photoUrl,
                             fit: BoxFit.cover,
-                            errorWidget: (_, __, _e) => const Icon(Icons.storefront_outlined, size: 28, color: AppColors.blue600),
+                            errorWidget: (ctx, url, err) => const Icon(Icons.storefront_outlined, size: 28, color: AppColors.blue600),
                           ),
                         )
                       : const Icon(Icons.storefront_outlined, size: 28, color: AppColors.blue600),
@@ -400,6 +427,257 @@ class _ApprovalBanner extends StatelessWidget {
 }
 
 // ─── Info View (read-only) ────────────────────────────────────────────────────
+
+// ─── Profile Skeleton ─────────────────────────────────────────────────────────
+
+class _ProfileSkeleton extends StatelessWidget {
+  const _ProfileSkeleton();
+
+  static Widget _navRowSkeleton() => Container(
+        margin: const EdgeInsets.only(bottom: 10),
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: AppColors.gray200),
+        ),
+        child: const Row(
+          children: [
+            SkeletonBox(height: 36, width: 36, radius: 10),
+            SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  SkeletonBox(height: 14, width: 120, radius: 4),
+                  SizedBox(height: 6),
+                  SkeletonBox(height: 11, width: 180, radius: 4),
+                ],
+              ),
+            ),
+            SkeletonBox(height: 16, width: 16, radius: 4),
+          ],
+        ),
+      );
+
+  @override
+  Widget build(BuildContext context) {
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // _CompanyBanner skeleton
+          Container(
+            padding: const EdgeInsets.all(20),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: AppColors.gray200),
+            ),
+            child: const Row(
+              children: [
+                SkeletonBox(height: 72, width: 72, radius: 16),
+                SizedBox(width: 16),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      SkeletonBox(height: 18, radius: 5),
+                      SizedBox(height: 8),
+                      SkeletonBox(height: 13, width: 100, radius: 4),
+                      SizedBox(height: 8),
+                      SkeletonBox(height: 13, width: 140, radius: 4),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 12),
+          // _ApprovalBanner skeleton
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: AppColors.gray200),
+            ),
+            child: const Row(
+              children: [
+                SkeletonBox(height: 16, width: 16, radius: 8),
+                SizedBox(width: 10),
+                Expanded(child: SkeletonBox(height: 13, radius: 4)),
+              ],
+            ),
+          ),
+          const SizedBox(height: 16),
+          // Nav rows
+          _navRowSkeleton(),
+          _navRowSkeleton(),
+          const SizedBox(height: 16),
+          // _InfoView skeleton
+          Container(
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: AppColors.gray200),
+            ),
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const SkeletonBox(height: 14, width: 120, radius: 4),
+                const Divider(height: 20),
+                ...List.generate(5, (i) => Padding(
+                  padding: const EdgeInsets.only(bottom: 14),
+                  child: const Row(
+                    children: [
+                      SkeletonBox(height: 12, width: 90, radius: 4),
+                      SizedBox(width: 16),
+                      Expanded(child: SkeletonBox(height: 14, radius: 4)),
+                    ],
+                  ),
+                )),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ─── Map Card ────────────────────────────────────────────────────────────────
+
+class _MapCard extends StatefulWidget {
+  final Map<String, dynamic> profile;
+
+  const _MapCard({required this.profile});
+
+  @override
+  State<_MapCard> createState() => _MapCardState();
+}
+
+class _MapCardState extends State<_MapCard> {
+  LatLng? _point;
+  bool _loading = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _resolve();
+  }
+
+  Future<void> _resolve() async {
+    final latStr = widget.profile['latitude'] as String?;
+    final lngStr = widget.profile['longitude'] as String?;
+    final lat = double.tryParse(latStr ?? '');
+    final lng = double.tryParse(lngStr ?? '');
+
+    if (lat != null && lng != null) {
+      setState(() => _point = LatLng(lat, lng));
+      return;
+    }
+
+    final parts = [
+      widget.profile['address'] as String?,
+      widget.profile['district'] as String?,
+      widget.profile['city'] as String?,
+      'Türkiye',
+    ].whereType<String>().where((s) => s.isNotEmpty).toList();
+
+    if (parts.isEmpty) return;
+
+    setState(() => _loading = true);
+    try {
+      final query = Uri.encodeComponent(parts.join(', '));
+      final uri = Uri.parse('https://nominatim.openstreetmap.org/search?q=$query&format=json&limit=1');
+      final client = HttpClient();
+      final request = await client.getUrl(uri);
+      request.headers.set('User-Agent', 'SanayiServisApp/1.0');
+      final response = await request.close();
+      final body = await response.transform(const Utf8Decoder()).join();
+      final list = jsonDecode(body) as List<dynamic>;
+      if (list.isNotEmpty) {
+        final item = list.first as Map<String, dynamic>;
+        final resLat = double.tryParse(item['lat'] as String? ?? '');
+        final resLng = double.tryParse(item['lon'] as String? ?? '');
+        if (resLat != null && resLng != null && mounted) {
+          setState(() => _point = LatLng(resLat, resLng));
+        }
+      }
+    } catch (_) {}
+    if (mounted) setState(() => _loading = false);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (!_loading && _point == null) return const SizedBox.shrink();
+
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: AppColors.gray200),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Padding(
+            padding: EdgeInsets.fromLTRB(16, 14, 16, 0),
+            child: Row(
+              children: [
+                Icon(Icons.location_on_outlined, size: 16, color: AppColors.blue600),
+                SizedBox(width: 8),
+                Text('Konum', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 14, color: AppColors.gray900)),
+              ],
+            ),
+          ),
+          const Divider(height: 16, indent: 16, endIndent: 16),
+          ClipRRect(
+            borderRadius: const BorderRadius.only(
+              bottomLeft: Radius.circular(16),
+              bottomRight: Radius.circular(16),
+            ),
+            child: SizedBox(
+              height: 200,
+              child: _loading
+                  ? const Center(child: CircularProgressIndicator(color: AppColors.blue600, strokeWidth: 2))
+                  : FlutterMap(
+                      options: MapOptions(
+                        initialCenter: _point!,
+                        initialZoom: 15,
+                        interactionOptions: const InteractionOptions(
+                          flags: InteractiveFlag.pinchZoom | InteractiveFlag.drag,
+                        ),
+                      ),
+                      children: [
+                        TileLayer(
+                          urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+                          userAgentPackageName: 'com.bozappz.sanayiServisApp',
+                        ),
+                        MarkerLayer(
+                          markers: [
+                            Marker(
+                              point: _point!,
+                              width: 40,
+                              height: 40,
+                              child: const Icon(Icons.location_pin, color: Colors.red, size: 40),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ─── Info View ────────────────────────────────────────────────────────────────
 
 class _InfoView extends StatelessWidget {
   final Map<String, dynamic> profile;
@@ -607,6 +885,64 @@ class _Field extends StatelessWidget {
           ),
         ),
       ],
+    );
+  }
+}
+
+// ─── Nav Row ──────────────────────────────────────────────────────────────────
+
+class _NavRow extends StatelessWidget {
+  final IconData icon;
+  final Color color;
+  final String label;
+  final String subtitle;
+  final VoidCallback onTap;
+
+  const _NavRow({
+    required this.icon,
+    required this.color,
+    required this.label,
+    required this.subtitle,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: AppColors.gray200),
+        ),
+        child: Row(
+          children: [
+            Container(
+              width: 38,
+              height: 38,
+              decoration: BoxDecoration(
+                color: color.withValues(alpha: 0.1),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: Icon(icon, size: 20, color: color),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(label, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: AppColors.gray900)),
+                  const SizedBox(height: 2),
+                  Text(subtitle, style: const TextStyle(fontSize: 12, color: AppColors.gray500)),
+                ],
+              ),
+            ),
+            const Icon(Icons.chevron_right_rounded, size: 20, color: AppColors.gray400),
+          ],
+        ),
+      ),
     );
   }
 }

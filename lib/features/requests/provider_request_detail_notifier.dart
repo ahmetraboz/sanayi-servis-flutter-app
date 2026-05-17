@@ -11,6 +11,7 @@ class ProviderRequestDetailState {
   final Map<String, dynamic>? acceptedBid;
   final List<Map<String, dynamic>> updates;
   final Map<String, dynamic>? additionalInfo;
+  final String? vehicleImageUrl;
   final bool submittingBid;
   final bool requestingInfo;
   final bool postingUpdate;
@@ -25,6 +26,7 @@ class ProviderRequestDetailState {
     this.acceptedBid,
     this.updates = const [],
     this.additionalInfo,
+    this.vehicleImageUrl,
     this.submittingBid = false,
     this.requestingInfo = false,
     this.postingUpdate = false,
@@ -40,6 +42,7 @@ class ProviderRequestDetailState {
     Object? acceptedBid = _sentinel,
     List<Map<String, dynamic>>? updates,
     Object? additionalInfo = _sentinel,
+    Object? vehicleImageUrl = _sentinel,
     bool? submittingBid,
     bool? requestingInfo,
     bool? postingUpdate,
@@ -54,6 +57,7 @@ class ProviderRequestDetailState {
       acceptedBid: identical(acceptedBid, _sentinel) ? this.acceptedBid : acceptedBid as Map<String, dynamic>?,
       updates: updates ?? this.updates,
       additionalInfo: identical(additionalInfo, _sentinel) ? this.additionalInfo : additionalInfo as Map<String, dynamic>?,
+      vehicleImageUrl: identical(vehicleImageUrl, _sentinel) ? this.vehicleImageUrl : vehicleImageUrl as String?,
       submittingBid: submittingBid ?? this.submittingBid,
       requestingInfo: requestingInfo ?? this.requestingInfo,
       postingUpdate: postingUpdate ?? this.postingUpdate,
@@ -110,9 +114,29 @@ class ProviderRequestDetailNotifier extends StateNotifier<ProviderRequestDetailS
         updates: updates,
         additionalInfo: additionalInfo,
       );
+
+      _fetchVehicleImage(
+        make: request['vehicleBrand'] as String? ?? '',
+        model: request['vehicleModel'] as String? ?? '',
+        year: request['vehicleYear'] as int?,
+      );
     } on DioException catch (e) {
       state = state.copyWith(loading: false, error: e.message ?? 'Talep yüklenemedi');
     }
+  }
+
+  Future<void> _fetchVehicleImage({required String make, required String model, int? year}) async {
+    if (make.isEmpty || model.isEmpty) return;
+    try {
+      final params = <String, dynamic>{'make': make, 'model': model};
+      if (year != null) params['year'] = year;
+      final res = await _api.get('/api/cars/image', queryParameters: params);
+      final data = res.data as Map<String, dynamic>;
+      final imageUrl = data['primaryImageUrl'] as String?;
+      if (imageUrl != null && imageUrl.isNotEmpty) {
+        state = state.copyWith(vehicleImageUrl: imageUrl);
+      }
+    } catch (_) {}
   }
 
   Future<bool> submitBid({

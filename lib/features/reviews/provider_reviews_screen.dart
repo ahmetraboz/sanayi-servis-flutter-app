@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/theme/theme.dart';
+import '../../../shared/widgets/skeleton.dart';
 import 'provider_reviews_notifier.dart';
 
 class ProviderReviewsScreen extends ConsumerWidget {
@@ -35,7 +36,7 @@ class ProviderReviewsScreen extends ConsumerWidget {
 
   Widget _buildBody(BuildContext context, ProviderReviewsState state, ProviderReviewsNotifier notifier) {
     if (state.loading) {
-      return const Center(child: CircularProgressIndicator(color: AppColors.blue600, strokeWidth: 2));
+      return const _ReviewsSkeleton();
     }
 
     if (state.error != null) {
@@ -192,20 +193,12 @@ class _StarRow extends StatelessWidget {
 
 // ─── Review Card ──────────────────────────────────────────────────────────────
 
-class _ReviewCard extends StatefulWidget {
+class _ReviewCard extends StatelessWidget {
   final ReviewItem review;
   final bool isReplying;
   final Future<bool> Function(String) onReply;
 
   const _ReviewCard({required this.review, required this.isReplying, required this.onReply});
-
-  @override
-  State<_ReviewCard> createState() => _ReviewCardState();
-}
-
-class _ReviewCardState extends State<_ReviewCard> {
-  bool _showReplyForm = false;
-  final _controller = TextEditingController();
 
   static const _kMonths = ['Oca', 'Şub', 'Mar', 'Nis', 'May', 'Haz', 'Tem', 'Ağu', 'Eyl', 'Eki', 'Kas', 'Ara'];
 
@@ -218,27 +211,18 @@ class _ReviewCardState extends State<_ReviewCard> {
     }
   }
 
-  @override
-  void dispose() {
-    _controller.dispose();
-    super.dispose();
-  }
-
-  Future<void> _submit() async {
-    final text = _controller.text.trim();
-    if (text.isEmpty) return;
-    final ok = await widget.onReply(text);
-    if (ok && mounted) {
-      setState(() {
-        _showReplyForm = false;
-        _controller.clear();
-      });
-    }
+  void _openReplySheet(BuildContext context) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (_) => _ReplySheet(onReply: onReply),
+    );
   }
 
   @override
   Widget build(BuildContext context) {
-    final r = widget.review;
+    final r = review;
     final hasReply = r.providerReply != null && r.providerReply!.isNotEmpty;
 
     return Container(
@@ -317,13 +301,10 @@ class _ReviewCardState extends State<_ReviewCard> {
                 ],
               ),
             ),
-          ] else if (!_showReplyForm) ...[
+          ] else ...[
             const SizedBox(height: 10),
             GestureDetector(
-              onTap: () => setState(() {
-                _showReplyForm = true;
-                _controller.clear();
-              }),
+              onTap: () => _openReplySheet(context),
               child: const Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
@@ -334,51 +315,201 @@ class _ReviewCardState extends State<_ReviewCard> {
               ),
             ),
           ],
-          if (_showReplyForm) ...[
-            const SizedBox(height: 12),
-            TextField(
-              controller: _controller,
-              maxLines: 3,
-              decoration: InputDecoration(
-                hintText: 'Yanıtınızı yazın...',
-                hintStyle: const TextStyle(color: AppColors.gray400, fontSize: 13),
-                filled: true,
-                fillColor: AppColors.gray50,
-                border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: const BorderSide(color: AppColors.gray200)),
-                enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: const BorderSide(color: AppColors.gray200)),
-                focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: const BorderSide(color: AppColors.blue600)),
-                contentPadding: const EdgeInsets.all(12),
-              ),
+        ],
+      ),
+    );
+  }
+}
+
+// ─── Reply Sheet ──────────────────────────────────────────────────────────────
+
+class _ReplySheet extends StatefulWidget {
+  final Future<bool> Function(String) onReply;
+
+  const _ReplySheet({required this.onReply});
+
+  @override
+  State<_ReplySheet> createState() => _ReplySheetState();
+}
+
+class _ReplySheetState extends State<_ReplySheet> {
+  final _controller = TextEditingController();
+  bool _submitting = false;
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  Future<void> _submit() async {
+    final text = _controller.text.trim();
+    if (text.isEmpty) return;
+    setState(() => _submitting = true);
+    final ok = await widget.onReply(text);
+    if (mounted) {
+      setState(() => _submitting = false);
+      if (ok) Navigator.of(context).pop();
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final bottom = MediaQuery.of(context).viewInsets.bottom;
+    return Container(
+      decoration: const BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      padding: EdgeInsets.fromLTRB(20, 16, 20, 20 + bottom),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Center(
+            child: Container(
+              width: 36,
+              height: 4,
+              decoration: BoxDecoration(color: AppColors.gray200, borderRadius: BorderRadius.circular(2)),
             ),
-            const SizedBox(height: 8),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.end,
-              children: [
-                TextButton(
-                  onPressed: () => setState(() {
-                    _showReplyForm = false;
-                    _controller.clear();
-                  }),
-                  child: const Text('İptal', style: TextStyle(color: AppColors.gray500)),
+          ),
+          const SizedBox(height: 16),
+          const Text('Yanıt Yaz', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: AppColors.gray900)),
+          const SizedBox(height: 12),
+          TextField(
+            controller: _controller,
+            maxLines: 4,
+            autofocus: true,
+            decoration: InputDecoration(
+              hintText: 'Yanıtınızı yazın...',
+              hintStyle: const TextStyle(color: AppColors.gray400, fontSize: 13),
+              filled: true,
+              fillColor: AppColors.gray50,
+              border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: const BorderSide(color: AppColors.gray200)),
+              enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: const BorderSide(color: AppColors.gray200)),
+              focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: const BorderSide(color: AppColors.blue600)),
+              contentPadding: const EdgeInsets.all(12),
+            ),
+          ),
+          const SizedBox(height: 12),
+          Row(
+            children: [
+              Expanded(
+                child: OutlinedButton(
+                  onPressed: _submitting ? null : () => Navigator.of(context).pop(),
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: AppColors.gray600,
+                    side: const BorderSide(color: AppColors.gray200),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                  ),
+                  child: const Text('İptal', style: TextStyle(fontWeight: FontWeight.w600)),
                 ),
-                const SizedBox(width: 8),
-                ElevatedButton(
-                  onPressed: widget.isReplying ? null : _submit,
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: ElevatedButton(
+                  onPressed: _submitting ? null : _submit,
                   style: ElevatedButton.styleFrom(
                     backgroundColor: AppColors.blue600,
                     foregroundColor: Colors.white,
-                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                    padding: const EdgeInsets.symmetric(vertical: 14),
                   ),
-                  child: widget.isReplying
-                      ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
-                      : const Text('Gönder', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
+                  child: _submitting
+                      ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                      : const Text('Gönder', style: TextStyle(fontWeight: FontWeight.w600)),
                 ),
-              ],
-            ),
-          ],
+              ),
+            ],
+          ),
         ],
       ),
+    );
+  }
+}
+
+class _ReviewsSkeleton extends StatelessWidget {
+  const _ReviewsSkeleton();
+
+  @override
+  Widget build(BuildContext context) {
+    return ListView(
+      padding: const EdgeInsets.all(16),
+      children: [
+        Container(
+          padding: const EdgeInsets.all(20),
+          decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(16), border: Border.all(color: AppColors.gray200)),
+          child: const Row(
+            children: [
+              Column(
+                children: [
+                  SkeletonBox(height: 48, width: 60, radius: 8),
+                  SizedBox(height: 8),
+                  SkeletonBox(height: 12, width: 80, radius: 4),
+                  SizedBox(height: 6),
+                  SkeletonBox(height: 10, width: 70, radius: 4),
+                ],
+              ),
+              SizedBox(width: 24),
+              Expanded(
+                child: Column(
+                  children: [
+                    SkeletonBox(height: 8, radius: 4),
+                    SizedBox(height: 6),
+                    SkeletonBox(height: 8, radius: 4),
+                    SizedBox(height: 6),
+                    SkeletonBox(height: 8, radius: 4),
+                    SizedBox(height: 6),
+                    SkeletonBox(height: 8, radius: 4),
+                    SizedBox(height: 6),
+                    SkeletonBox(height: 8, radius: 4),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 20),
+        ...List.generate(4, (_) => Container(
+          margin: const EdgeInsets.only(bottom: 12),
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(14), border: Border.all(color: AppColors.gray200)),
+          child: const Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  SkeletonBox(height: 36, width: 36, radius: 18),
+                  SizedBox(width: 10),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        SkeletonBox(height: 13, radius: 5),
+                        SizedBox(height: 6),
+                        SkeletonBox(height: 11, width: 120, radius: 4),
+                      ],
+                    ),
+                  ),
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.end,
+                    children: [
+                      SkeletonBox(height: 12, width: 80, radius: 4),
+                      SizedBox(height: 6),
+                      SkeletonBox(height: 10, width: 60, radius: 4),
+                    ],
+                  ),
+                ],
+              ),
+              SizedBox(height: 12),
+              SkeletonBox(height: 12, radius: 4),
+              SizedBox(height: 6),
+              SkeletonBox(height: 12, width: 200, radius: 4),
+            ],
+          ),
+        )),
+      ],
     );
   }
 }

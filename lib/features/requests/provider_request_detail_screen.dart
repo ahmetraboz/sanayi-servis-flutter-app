@@ -1,57 +1,100 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../../../core/theme/theme.dart';
+import 'provider_open_requests_notifier.dart';
 import 'provider_request_detail_notifier.dart';
 
-class ProviderRequestDetailScreen extends ConsumerStatefulWidget {
+// ─── Category config ──────────────────────────────────────────────────────────
+
+typedef _Cat = ({String label, Color bg, Color text, IconData icon});
+
+const _categories = <String, _Cat>{
+  'motor':    (label: 'Motor',       bg: Color(0xFFFEE2E2), text: Color(0xFFDC2626), icon: Icons.local_fire_department_outlined),
+  'elektrik': (label: 'Elektrik',    bg: Color(0xFFFEF9C3), text: Color(0xFFCA8A04), icon: Icons.bolt_outlined),
+  'fren':     (label: 'Fren',        bg: Color(0xFFFFEDD5), text: Color(0xFFEA580C), icon: Icons.do_not_disturb_on_outlined),
+  'suspan':   (label: 'Süspansiyon', bg: Color(0xFFDBEAFE), text: Color(0xFF2563EB), icon: Icons.tune_outlined),
+  'kaporta':  (label: 'Kaporta',     bg: Color(0xFFF3E8FF), text: Color(0xFF9333EA), icon: Icons.brush_outlined),
+  'klima':    (label: 'Klima',       bg: Color(0xFFCFFAFE), text: Color(0xFF0891B2), icon: Icons.ac_unit_outlined),
+  'lastik':   (label: 'Lastik',      bg: Color(0xFFF1F5F9), text: Color(0xFF475569), icon: Icons.tire_repair_outlined),
+  'vites':    (label: 'Vites',       bg: Color(0xFFE0E7FF), text: Color(0xFF4F46E5), icon: Icons.settings_outlined),
+  'egzoz':    (label: 'Egzoz',       bg: Color(0xFFD1FAE5), text: Color(0xFF059669), icon: Icons.cloud_outlined),
+  'diger':    (label: 'Diğer',       bg: Color(0xFFF3F4F6), text: Color(0xFF6B7280), icon: Icons.help_outline),
+};
+
+typedef _Urg = ({String label, Color bg, Color text});
+
+const _urgency = <String, _Urg>{
+  'low':    (label: 'Acele Değil', bg: Color(0xFFDCFCE7), text: Color(0xFF16A34A)),
+  'normal': (label: 'Normal',      bg: Color(0xFFFEF9C3), text: Color(0xFFCA8A04)),
+  'urgent': (label: 'Acil',        bg: Color(0xFFFEE2E2), text: Color(0xFFDC2626)),
+};
+
+typedef _Stat = ({String label, Color bg, Color text});
+
+const _statuses = <String, _Stat>{
+  'open':           (label: 'Açık',                  bg: Color(0xFFDBEAFE), text: Color(0xFF2563EB)),
+  'bidding':        (label: 'Teklif Alınıyor',        bg: Color(0xFFEDE9FE), text: Color(0xFF7C3AED)),
+  'info_requested': (label: 'Bilgi Bekleniyor',       bg: Color(0xFFFEF9C3), text: Color(0xFFCA8A04)),
+  'info_provided':  (label: 'Bilgi Verildi',          bg: Color(0xFFDCFCE7), text: Color(0xFF16A34A)),
+  'accepted':       (label: 'Kabul Edildi',           bg: Color(0xFFDCFCE7), text: Color(0xFF16A34A)),
+  'in_progress':    (label: 'İşlemde',                bg: Color(0xFFFEF9C3), text: Color(0xFFCA8A04)),
+  'pending_review': (label: 'Değerlendirme Bekliyor', bg: Color(0xFFFEF9C3), text: Color(0xFFCA8A04)),
+  'completed':      (label: 'Tamamlandı',             bg: Color(0xFFDCFCE7), text: Color(0xFF16A34A)),
+  'cancelled':      (label: 'İptal',                  bg: Color(0xFFFEE2E2), text: Color(0xFFDC2626)),
+};
+
+// ─── Screen ───────────────────────────────────────────────────────────────────
+
+class ProviderRequestDetailScreen extends ConsumerWidget {
   final int requestId;
 
   const ProviderRequestDetailScreen({super.key, required this.requestId});
 
   @override
-  ConsumerState<ProviderRequestDetailScreen> createState() => _ProviderRequestDetailScreenState();
-}
-
-class _ProviderRequestDetailScreenState extends ConsumerState<ProviderRequestDetailScreen> {
-  bool _showBidForm = false;
-  bool _showInfoRequestForm = false;
-  bool _showUpdateForm = false;
-  bool _showCompleteForm = false;
-
-  @override
-  Widget build(BuildContext context) {
-    final state = ref.watch(providerRequestDetailProvider(widget.requestId));
-    final notifier = ref.read(providerRequestDetailProvider(widget.requestId).notifier);
+  Widget build(BuildContext context, WidgetRef ref) {
+    final state = ref.watch(providerRequestDetailProvider(requestId));
+    final notifier = ref.read(providerRequestDetailProvider(requestId).notifier);
 
     return Scaffold(
       backgroundColor: AppColors.gray50,
       appBar: AppBar(
         backgroundColor: Colors.white,
         elevation: 0,
-        title: Text(
-          state.request?['title'] as String? ?? 'Talep Detayı',
-          style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w600, color: AppColors.gray900),
-          overflow: TextOverflow.ellipsis,
+        title: const Text(
+          'Talep Detayı',
+          style: TextStyle(fontSize: 17, fontWeight: FontWeight.w600, color: AppColors.gray900),
         ),
+        iconTheme: const IconThemeData(color: AppColors.gray900),
         actions: [
-          if (!state.loading)
+          if (!state.loading && state.request != null)
             IconButton(
-              icon: const Icon(Icons.refresh_outlined, color: AppColors.gray600),
+              icon: const Icon(Icons.refresh_rounded, size: 20),
               onPressed: notifier.loadDetail,
+              tooltip: 'Yenile',
             ),
         ],
       ),
-      body: _buildBody(context, state, notifier),
+      body: SafeArea(
+        top: false,
+        child: Column(
+          children: [
+            Expanded(child: _buildContent(context, state, notifier)),
+            if (state.request != null && state.canBid)
+              _ActionBar(state: state, notifier: notifier, requestId: requestId),
+          ],
+        ),
+      ),
     );
   }
 
-  Widget _buildBody(
+  Widget _buildContent(
     BuildContext context,
     ProviderRequestDetailState state,
     ProviderRequestDetailNotifier notifier,
   ) {
-    if (state.loading && state.request == null) {
+    if (state.request == null && state.error == null) {
       return const Center(
         child: CircularProgressIndicator(color: AppColors.blue600, strokeWidth: 2),
       );
@@ -59,252 +102,106 @@ class _ProviderRequestDetailScreenState extends ConsumerState<ProviderRequestDet
 
     if (state.error != null && state.request == null) {
       return Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            const Icon(Icons.error_outline, size: 48, color: AppColors.gray300),
-            const SizedBox(height: 12),
-            Text(state.error!, style: const TextStyle(color: AppColors.gray500, fontSize: 14), textAlign: TextAlign.center),
-            const SizedBox(height: 12),
-            TextButton(
-              onPressed: notifier.loadDetail,
-              child: const Text('Tekrar Dene', style: TextStyle(color: AppColors.blue600)),
-            ),
-          ],
+        child: Padding(
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              const Icon(Icons.error_outline, size: 48, color: AppColors.gray300),
+              const SizedBox(height: 16),
+              Text(
+                state.error!,
+                style: const TextStyle(color: AppColors.gray500, fontSize: 14),
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 16),
+              ElevatedButton(
+                onPressed: notifier.loadDetail,
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppColors.primary600,
+                  foregroundColor: Colors.white,
+                ),
+                child: const Text('Tekrar Dene'),
+              ),
+            ],
+          ),
         ),
       );
     }
 
-    if (state.request == null) {
-      return const Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(Icons.warning_amber_outlined, size: 48, color: AppColors.gray300),
-            SizedBox(height: 12),
-            Text('Talep bulunamadı', style: TextStyle(color: AppColors.gray500, fontSize: 14)),
-          ],
-        ),
-      );
-    }
+    final req = state.request!;
 
     return RefreshIndicator(
       color: AppColors.blue600,
       onRefresh: notifier.loadDetail,
-      child: SingleChildScrollView(
-        physics: const AlwaysScrollableScrollPhysics(),
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            _RequestDetailCard(request: state.request!),
-            const SizedBox(height: 12),
-
-            if (state.isInfoRequested) ...[
-              _AlertCard(
-                icon: Icons.schedule_outlined,
-                iconColor: AppColors.amber600,
-                bg: AppColors.amber50,
-                title: 'Ek Bilgi Bekleniyor',
-                description: 'Müşteriye ek bilgi talebi gönderildi, yanıt bekleniyor.',
-              ),
-              const SizedBox(height: 12),
-            ],
-
-            if (state.isInfoProvided && state.additionalInfo != null) ...[
-              _AdditionalInfoCard(info: state.additionalInfo!),
-              const SizedBox(height: 12),
-            ],
-
-            if (state.acceptedBid != null || state.updates.isNotEmpty) ...[
-              _JobUpdatesCard(
-                updates: state.updates,
-                canUpdate: state.canUpdate,
-                showForm: _showUpdateForm,
-                submitting: state.postingUpdate,
-                onShowForm: () => setState(() => _showUpdateForm = true),
-                onCancelForm: () => setState(() => _showUpdateForm = false),
-                onSubmitUpdate: (data) async {
-                  final ok = await notifier.postUpdate(data);
-                  if (ok && mounted) setState(() => _showUpdateForm = false);
-                },
-              ),
-              const SizedBox(height: 12),
-            ],
-
-            if (state.isPendingReview) ...[
-              _AlertCard(
-                icon: Icons.star_outline,
-                iconColor: AppColors.amber600,
-                bg: AppColors.amber50,
-                title: 'Değerlendirme Bekleniyor',
-                description: 'İşi tamamladınız. Müşteri değerlendirmesini bekliyorsunuz.',
-              ),
-              const SizedBox(height: 12),
-            ],
-
-            if (state.isCompleted) ...[
-              _AlertCard(
-                icon: Icons.check_circle_outline,
-                iconColor: AppColors.primary600,
-                bg: AppColors.green50,
-                title: 'Talep Tamamlandı',
-                description: 'Müşteri değerlendirmesini yaptı. Bu talep başarıyla tamamlandı.',
-              ),
-              const SizedBox(height: 12),
-            ],
-
-            if (state.actionError != null) ...[
-              Container(
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: AppColors.red50,
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: AppColors.red100),
-                ),
-                child: Row(
-                  children: [
-                    const Icon(Icons.error_outline, size: 18, color: AppColors.red700),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: Text(state.actionError!, style: const TextStyle(fontSize: 13, color: AppColors.red700)),
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(height: 12),
-            ],
-
-            if (state.canBid && !_showBidForm && !_showInfoRequestForm) ...[
-              _ActionButtons(
-                canRequestInfo: state.canRequestInfo,
-                dismissing: state.dismissing,
-                onDismiss: () => _showDismissDialog(context, notifier),
-                onRequestInfo: () => setState(() => _showInfoRequestForm = true),
-                onBid: () => setState(() => _showBidForm = true),
-              ),
-              const SizedBox(height: 12),
-            ],
-
-            if (_showInfoRequestForm) ...[
-              _InfoRequestForm(
-                submitting: state.requestingInfo,
-                onSubmit: (data) async {
-                  final ok = await notifier.requestInfo(data);
-                  if (ok && mounted) setState(() => _showInfoRequestForm = false);
-                },
-                onCancel: () => setState(() => _showInfoRequestForm = false),
-              ),
-              const SizedBox(height: 12),
-            ],
-
-            if (_showBidForm) ...[
-              _BidForm(
-                submitting: state.submittingBid,
-                onSubmit: (price, description, estimatedDuration) async {
-                  final ok = await notifier.submitBid(
-                    price: price,
-                    description: description,
-                    estimatedDuration: estimatedDuration,
-                  );
-                  if (ok && mounted) {
-                    setState(() => _showBidForm = false);
-                    if (context.mounted) context.go('/provider/bids');
-                  }
-                },
-                onCancel: () => setState(() => _showBidForm = false),
-              ),
-              const SizedBox(height: 12),
-            ],
-
-            if (state.canComplete && !_showUpdateForm && !_showCompleteForm) ...[
-              _CompleteJobButton(
-                onTap: () => setState(() => _showCompleteForm = true),
-              ),
-              const SizedBox(height: 12),
-            ],
-
-            if (_showCompleteForm) ...[
-              _CompleteJobForm(
-                submitting: state.completing,
-                onSubmit: (data) async {
-                  final ok = await notifier.completeJob(
-                    workDone: data['workDone'] as String,
-                    partsUsed: data['partsUsed'] as String?,
-                    laborCost: data['laborCost'] as num?,
-                    partsCost: data['partsCost'] as num?,
-                    totalCost: data['totalCost'] as num?,
-                  );
-                  if (ok && mounted) setState(() => _showCompleteForm = false);
-                },
-                onCancel: () => setState(() => _showCompleteForm = false),
-              ),
-              const SizedBox(height: 12),
-            ],
-
-            const SizedBox(height: 24),
-          ],
-        ),
-      ),
-    );
-  }
-
-  void _showDismissDialog(BuildContext context, ProviderRequestDetailNotifier notifier) {
-    showDialog(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: const Row(
-          children: [
-            Icon(Icons.cancel_outlined, color: AppColors.red700),
-            SizedBox(width: 8),
-            Text('Talebi Reddet', style: TextStyle(fontSize: 17, fontWeight: FontWeight.w600)),
-          ],
-        ),
-        content: const Text(
-          'Bu talep listenizden kaldırılacak, müşteri bilgilendirilmeyecek.',
-          style: TextStyle(fontSize: 14, color: AppColors.gray600),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: const Text('Vazgeç', style: TextStyle(color: AppColors.gray500)),
+      child: ListView(
+      padding: const EdgeInsets.fromLTRB(16, 16, 16, 16),
+      children: [
+        _HeaderCard(request: req),
+        const SizedBox(height: 12),
+        if (state.isInfoRequested) ...[
+          _StatusBanner(
+            icon: Icons.access_time_rounded,
+            color: const Color(0xFFCA8A04),
+            bg: const Color(0xFFFEF9C3),
+            title: 'Ek Bilgi Bekleniyor',
+            subtitle: 'Müşteriye ek bilgi talebi gönderildi, yanıt bekleniyor.',
           ),
-          ElevatedButton(
-            style: ElevatedButton.styleFrom(
-              backgroundColor: AppColors.red700,
-              foregroundColor: Colors.white,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-            ),
-            onPressed: () async {
-              final ok = await notifier.dismissRequest();
-              if (ok) {
-                if (ctx.mounted) Navigator.pop(ctx);
-                if (context.mounted) context.go('/provider/requests');
-              }
-            },
-            child: const Text('Evet, Reddet'),
+          const SizedBox(height: 12),
+        ],
+        if (state.isInfoProvided && state.additionalInfo != null) ...[
+          _AdditionalInfoCard(info: state.additionalInfo!),
+          const SizedBox(height: 12),
+        ],
+        _VehicleCard(request: req, imageUrl: state.vehicleImageUrl),
+        const SizedBox(height: 12),
+        _CustomerCard(request: req),
+        if (req['aiDetectedPart'] != null) ...[
+          const SizedBox(height: 12),
+          _AiCard(request: req),
+        ],
+        if (state.updates.isNotEmpty || state.acceptedBid != null) ...[
+          const SizedBox(height: 12),
+          _JobLogCard(updates: state.updates),
+        ],
+        if (state.isPendingReview) ...[
+          const SizedBox(height: 12),
+          _StatusBanner(
+            icon: Icons.star_outline_rounded,
+            color: const Color(0xFFCA8A04),
+            bg: const Color(0xFFFEF9C3),
+            title: 'Değerlendirme Bekleniyor',
+            subtitle: 'İşi tamamladınız. Müşteri değerlendirmesini bekliyorsunuz.',
           ),
         ],
+        if (state.isCompleted) ...[
+          const SizedBox(height: 12),
+          _StatusBanner(
+            icon: Icons.check_circle_outline_rounded,
+            color: const Color(0xFF16A34A),
+            bg: const Color(0xFFDCFCE7),
+            title: 'Talep Tamamlandı',
+            subtitle: 'Müşteri değerlendirmesini yaptı. Bu talep başarıyla tamamlandı.',
+          ),
+        ],
+      ],
       ),
     );
   }
 }
 
-// ─── Request Detail Card ──────────────────────────────────────────────────────
+// ─── Header card ──────────────────────────────────────────────────────────────
 
-class _RequestDetailCard extends StatelessWidget {
+class _HeaderCard extends StatelessWidget {
   final Map<String, dynamic> request;
+  const _HeaderCard({required this.request});
 
-  const _RequestDetailCard({required this.request});
-
-  static const _kMonths = ['Oca', 'Şub', 'Mar', 'Nis', 'May', 'Haz', 'Tem', 'Ağu', 'Eyl', 'Eki', 'Kas', 'Ara'];
-
-  String _fmtDate(String? iso) {
+  String _formatDate(String? iso) {
     if (iso == null) return '';
     try {
-      final dt = DateTime.parse(iso);
-      return '${dt.day} ${_kMonths[dt.month - 1]} ${dt.year}';
+      final dt = DateTime.parse(iso).toLocal();
+      const months = ['Oca', 'Şub', 'Mar', 'Nis', 'May', 'Haz', 'Tem', 'Ağu', 'Eyl', 'Eki', 'Kas', 'Ara'];
+      return '${dt.day} ${months[dt.month - 1]} ${dt.year}';
     } catch (_) {
       return '';
     }
@@ -312,21 +209,17 @@ class _RequestDetailCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final title = request['title'] as String? ?? '';
+    final title = request['title'] as String? ?? 'Başlıksız Talep';
     final description = request['description'] as String? ?? '';
-    final status = request['status'] as String? ?? '';
-    final brand = request['vehicleBrand'] as String? ?? '';
-    final model = request['vehicleModel'] as String? ?? '';
-    final year = request['vehicleYear'];
-    final plate = request['vehiclePlate'] as String?;
-    final fuelType = request['vehicleFuelType'] as String?;
-    final transmission = request['vehicleTransmissionType'] as String?;
-    final engine = request['vehicleEngineDisplacement'] as String?;
-    final customerName = request['customerName'] as String?;
-    final customerPhone = request['customerPhone'] as String?;
-    final createdAt = request['createdAt'] as String?;
-    final urgency = request['urgencyLevel'] as String?;
     final category = request['problemCategory'] as String?;
+    final urgency = request['urgencyLevel'] as String?;
+    final status = request['status'] as String?;
+    final createdAt = request['createdAt'] as String?;
+    final imageUrl = request['imageUrl'] as String?;
+
+    final cat = category != null ? _categories[category] : null;
+    final urg = urgency != null ? _urgency[urgency] : null;
+    final stat = status != null ? _statuses[status] : null;
 
     return Container(
       padding: const EdgeInsets.all(16),
@@ -344,90 +237,276 @@ class _RequestDetailCard extends StatelessWidget {
               Expanded(
                 child: Text(
                   title,
-                  style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w700, color: AppColors.gray900),
+                  style: const TextStyle(
+                    fontSize: 17,
+                    fontWeight: FontWeight.w700,
+                    color: AppColors.gray900,
+                    height: 1.3,
+                  ),
                 ),
               ),
-              const SizedBox(width: 12),
-              _StatusBadge(status: status),
+              if (createdAt != null && createdAt.isNotEmpty) ...[
+                const SizedBox(width: 8),
+                Text(
+                  _formatDate(createdAt),
+                  style: const TextStyle(fontSize: 12, color: AppColors.gray400),
+                ),
+              ],
+            ],
+          ),
+          const SizedBox(height: 10),
+          Wrap(
+            spacing: 6,
+            runSpacing: 4,
+            children: [
+              if (cat != null) _SmallBadge(label: cat.label, bg: cat.bg, text: cat.text, icon: cat.icon),
+              if (urg != null) _SmallBadge(label: urg.label, bg: urg.bg, text: urg.text),
+              if (stat != null) _SmallBadge(label: stat.label, bg: stat.bg, text: stat.text),
             ],
           ),
           if (description.isNotEmpty) ...[
-            const SizedBox(height: 10),
+            const SizedBox(height: 12),
             Text(
               description,
-              style: const TextStyle(fontSize: 14, color: AppColors.gray600, height: 1.6),
+              style: const TextStyle(fontSize: 14, color: AppColors.gray600, height: 1.5),
             ),
           ],
-          const SizedBox(height: 14),
-          Container(
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(
-              color: AppColors.gray50,
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: AppColors.gray200),
+          if (imageUrl != null && imageUrl.isNotEmpty) ...[
+            const SizedBox(height: 12),
+            ClipRRect(
+              borderRadius: BorderRadius.circular(10),
+              child: Image.network(
+                imageUrl,
+                width: double.infinity,
+                height: 200,
+                fit: BoxFit.cover,
+                errorBuilder: (ctx, err, st) => const SizedBox.shrink(),
+              ),
             ),
-            child: Column(
-              children: [
-                _InfoRow(label: 'Araç', value: '$brand $model${year != null ? ' ($year)' : ''}'.trim()),
-                if (plate != null && plate.isNotEmpty) _InfoRow(label: 'Plaka', value: plate),
-                if (fuelType != null && fuelType.isNotEmpty) _InfoRow(label: 'Yakıt', value: fuelType),
-                if (transmission != null && transmission.isNotEmpty) _InfoRow(label: 'Şanzıman', value: transmission),
-                if (engine != null && engine.isNotEmpty) _InfoRow(label: 'Motor', value: '$engine L'),
-                if (customerName != null && customerName.isNotEmpty) _InfoRow(label: 'Müşteri', value: customerName),
-                if (customerPhone != null && customerPhone.isNotEmpty) _InfoRow(label: 'Telefon', value: customerPhone),
-              ],
-            ),
-          ),
-          const SizedBox(height: 12),
-          Wrap(
-            spacing: 8,
-            runSpacing: 6,
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+// ─── Vehicle card ─────────────────────────────────────────────────────────────
+
+class _VehicleCard extends StatelessWidget {
+  final Map<String, dynamic> request;
+  final String? imageUrl;
+  const _VehicleCard({required this.request, this.imageUrl});
+
+  @override
+  Widget build(BuildContext context) {
+    final brand = request['vehicleBrand'] as String? ?? '';
+    final model = request['vehicleModel'] as String? ?? '';
+    final year = request['vehicleYear'] as int?;
+    final plate = request['vehiclePlate'] as String?;
+
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: AppColors.gray200),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
             children: [
-              if (createdAt != null && createdAt.isNotEmpty)
-                _Chip(icon: Icons.calendar_today_outlined, label: _fmtDate(createdAt)),
-              if (urgency != null && urgency.isNotEmpty)
-                _UrgencyChip(level: urgency),
-              if (category != null && category.isNotEmpty)
-                _Chip(icon: Icons.category_outlined, label: _categoryLabel(category)),
+              const Icon(Icons.directions_car_outlined, size: 16, color: AppColors.primary600),
+              const SizedBox(width: 6),
+              const Text(
+                'Araç Bilgileri',
+                style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: AppColors.gray900),
+              ),
+            ],
+          ),
+          const SizedBox(height: 14),
+          Row(
+            children: [
+              ClipRRect(
+                borderRadius: BorderRadius.circular(10),
+                child: Container(
+                  width: 80,
+                  height: 56,
+                  decoration: BoxDecoration(
+                    color: AppColors.gray100,
+                    border: Border.all(color: AppColors.gray200),
+                  ),
+                  child: imageUrl != null
+                      ? Image.network(
+                          imageUrl!,
+                          fit: BoxFit.cover,
+                          errorBuilder: (ctx, err, st) => const Icon(Icons.directions_car_rounded, size: 32, color: AppColors.gray300),
+                        )
+                      : const Icon(Icons.directions_car_rounded, size: 32, color: AppColors.gray300),
+                ),
+              ),
+              const SizedBox(width: 14),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      '$brand $model',
+                      style: const TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w700,
+                        color: AppColors.gray900,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Row(
+                      children: [
+                        if (year != null) ...[
+                          const Icon(Icons.calendar_today_outlined, size: 13, color: AppColors.gray400),
+                          const SizedBox(width: 3),
+                          Text(
+                            '$year Model',
+                            style: const TextStyle(fontSize: 13, color: AppColors.gray500),
+                          ),
+                        ],
+                        if (year != null && plate != null) const SizedBox(width: 10),
+                        if (plate != null)
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                            decoration: BoxDecoration(
+                              color: AppColors.gray100,
+                              borderRadius: BorderRadius.circular(6),
+                              border: Border.all(color: AppColors.gray300),
+                            ),
+                            child: Text(
+                              plate,
+                              style: const TextStyle(
+                                fontSize: 12,
+                                fontWeight: FontWeight.w700,
+                                color: AppColors.gray700,
+                                letterSpacing: 1.5,
+                              ),
+                            ),
+                          ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
             ],
           ),
         ],
       ),
     );
   }
-
-  String _categoryLabel(String key) {
-    const labels = {
-      'maintenance': 'Periyodik Bakım',
-      'engine': 'Motor & Mekanik',
-      'electrical': 'Elektrik & Elektronik',
-      'body': 'Kaporta & Boya',
-      'tire': 'Lastik & Jant',
-      'other': 'Diğer',
-    };
-    return labels[key] ?? key;
-  }
 }
 
-class _InfoRow extends StatelessWidget {
-  final String label;
-  final String value;
+// ─── Customer card ────────────────────────────────────────────────────────────
 
-  const _InfoRow({required this.label, required this.value});
+class _CustomerCard extends StatelessWidget {
+  final Map<String, dynamic> request;
+  const _CustomerCard({required this.request});
 
   @override
   Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 6),
-      child: Row(
+    final name = request['customerName'] as String? ?? 'Müşteri';
+    final phone = request['customerPhone'] as String?;
+    final initial = name.isNotEmpty ? name[0].toUpperCase() : 'M';
+
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: AppColors.gray200),
+      ),
+      child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          SizedBox(
-            width: 72,
-            child: Text(label, style: const TextStyle(fontSize: 12, color: AppColors.gray400, fontWeight: FontWeight.w500)),
+          Row(
+            children: [
+              const Icon(Icons.person_outline, size: 16, color: AppColors.primary600),
+              const SizedBox(width: 6),
+              const Text(
+                'Müşteri Bilgileri',
+                style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: AppColors.gray900),
+              ),
+            ],
           ),
-          Expanded(
-            child: Text(value, style: const TextStyle(fontSize: 13, color: AppColors.gray700, fontWeight: FontWeight.w500)),
+          const SizedBox(height: 14),
+          Row(
+            children: [
+              Container(
+                width: 44,
+                height: 44,
+                decoration: BoxDecoration(
+                  color: AppColors.primary600.withValues(alpha: 0.1),
+                  shape: BoxShape.circle,
+                ),
+                child: Center(
+                  child: Text(
+                    initial,
+                    style: const TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.w700,
+                      color: AppColors.primary600,
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      name,
+                      style: const TextStyle(
+                        fontSize: 15,
+                        fontWeight: FontWeight.w600,
+                        color: AppColors.gray900,
+                      ),
+                    ),
+                    if (phone != null)
+                      Text(
+                        phone,
+                        style: const TextStyle(fontSize: 13, color: AppColors.gray500),
+                      ),
+                  ],
+                ),
+              ),
+              if (phone != null)
+                GestureDetector(
+                  onTap: () async {
+                    final uri = Uri(scheme: 'tel', path: phone);
+                    if (await canLaunchUrl(uri)) {
+                      await launchUrl(uri);
+                    }
+                  },
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFDCFCE7),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: const Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(Icons.phone_outlined, size: 14, color: Color(0xFF16A34A)),
+                        SizedBox(width: 4),
+                        Text(
+                          'Ara',
+                          style: TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w600,
+                            color: Color(0xFF16A34A),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+            ],
           ),
         ],
       ),
@@ -435,147 +514,38 @@ class _InfoRow extends StatelessWidget {
   }
 }
 
-class _StatusBadge extends StatelessWidget {
-  final String status;
-
-  const _StatusBadge({required this.status});
-
-  static const _labels = <String, String>{
-    'open': 'Açık',
-    'bidding': 'Teklifte',
-    'info_requested': 'Bilgi Bekleniyor',
-    'info_provided': 'Bilgi Geldi',
-    'accepted': 'Kabul Edildi',
-    'in_progress': 'Devam Ediyor',
-    'pending_review': 'Değerlendirme',
-    'completed': 'Tamamlandı',
-    'cancelled': 'İptal',
-  };
-
-  static const _colors = <String, Color>{
-    'open': AppColors.blue600,
-    'bidding': Color(0xFF7C3AED),
-    'info_requested': AppColors.amber600,
-    'info_provided': AppColors.primary600,
-    'accepted': AppColors.primary600,
-    'in_progress': AppColors.blue600,
-    'pending_review': AppColors.amber600,
-    'completed': AppColors.gray500,
-    'cancelled': AppColors.red700,
-  };
-
-  static const _bgColors = <String, Color>{
-    'open': Color(0xFFEFF6FF),
-    'bidding': Color(0xFFF5F3FF),
-    'info_requested': AppColors.amber50,
-    'info_provided': AppColors.green50,
-    'accepted': AppColors.green50,
-    'in_progress': Color(0xFFEFF6FF),
-    'pending_review': Color(0xFFFEF3C7),
-    'completed': AppColors.gray100,
-    'cancelled': AppColors.red50,
-  };
-
-  @override
-  Widget build(BuildContext context) {
-    final label = _labels[status] ?? status;
-    final color = _colors[status] ?? AppColors.gray500;
-    final bg = _bgColors[status] ?? AppColors.gray100;
-
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-      decoration: BoxDecoration(color: bg, borderRadius: BorderRadius.circular(8)),
-      child: Text(label, style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: color)),
-    );
-  }
-}
-
-class _UrgencyChip extends StatelessWidget {
-  final String level;
-
-  const _UrgencyChip({required this.level});
-
-  @override
-  Widget build(BuildContext context) {
-    final (icon, color, bg) = switch (level) {
-      'urgent' => (Icons.priority_high, AppColors.amber600, AppColors.amber50),
-      'critical' => (Icons.warning_amber_outlined, AppColors.red700, AppColors.red50),
-      _ => (Icons.remove_circle_outline, AppColors.gray500, AppColors.gray100),
-    };
-    final label = switch (level) {
-      'urgent' => 'Acil',
-      'critical' => 'Kritik',
-      _ => 'Normal',
-    };
-
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-      decoration: BoxDecoration(color: bg, borderRadius: BorderRadius.circular(8)),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(icon, size: 13, color: color),
-          const SizedBox(width: 4),
-          Text(label, style: TextStyle(fontSize: 12, fontWeight: FontWeight.w500, color: color)),
-        ],
-      ),
-    );
-  }
-}
-
-class _Chip extends StatelessWidget {
-  final IconData icon;
-  final String label;
-
-  const _Chip({required this.icon, required this.label});
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-      decoration: BoxDecoration(color: AppColors.gray100, borderRadius: BorderRadius.circular(8)),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(icon, size: 13, color: AppColors.gray500),
-          const SizedBox(width: 4),
-          Text(label, style: const TextStyle(fontSize: 12, color: AppColors.gray600)),
-        ],
-      ),
-    );
-  }
-}
-
-// ─── Additional Info Card ─────────────────────────────────────────────────────
+// ─── Additional info card ─────────────────────────────────────────────────────
 
 class _AdditionalInfoCard extends StatelessWidget {
   final Map<String, dynamic> info;
-
   const _AdditionalInfoCard({required this.info});
 
   @override
   Widget build(BuildContext context) {
-    final engine = info['engineDisplacement'] as String?;
-    final fuel = info['fuelType'] as String?;
-    final transmission = info['transmissionType'] as String?;
-    final body = info['bodyType'] as String?;
-    final mileage = info['mileage'];
-    final notes = info['additionalNotes'] as String?;
+    final items = <({IconData icon, Color color, String label, String value})>[];
+    if (info['engineDisplacement'] != null) {
+      items.add((icon: Icons.settings_outlined, color: AppColors.gray500, label: 'Motor Hacmi', value: info['engineDisplacement'].toString()));
+    }
+    if (info['fuelType'] != null) {
+      items.add((icon: Icons.local_fire_department_outlined, color: const Color(0xFFF97316), label: 'Yakıt Türü', value: info['fuelType'].toString()));
+    }
+    if (info['transmissionType'] != null) {
+      items.add((icon: Icons.tune_outlined, color: const Color(0xFF3B82F6), label: 'Vites Tipi', value: info['transmissionType'].toString()));
+    }
+    if (info['bodyType'] != null) {
+      items.add((icon: Icons.directions_car_outlined, color: AppColors.gray500, label: 'Kasa Tipi', value: info['bodyType'].toString()));
+    }
+    if (info['mileage'] != null) {
+      items.add((icon: Icons.speed_outlined, color: AppColors.gray500, label: 'Kilometre', value: '${info['mileage']} km'));
+    }
 
-    final items = <({IconData icon, String label, String value})>[];
-    if (engine != null && engine.isNotEmpty) items.add((icon: Icons.settings_outlined, label: 'Motor Hacmi', value: engine));
-    if (fuel != null && fuel.isNotEmpty) items.add((icon: Icons.local_gas_station_outlined, label: 'Yakıt Türü', value: fuel));
-    if (transmission != null && transmission.isNotEmpty) items.add((icon: Icons.tune_outlined, label: 'Vites Tipi', value: transmission));
-    if (body != null && body.isNotEmpty) items.add((icon: Icons.directions_car_outlined, label: 'Kasa Tipi', value: body));
-    if (mileage != null) items.add((icon: Icons.speed_outlined, label: 'Kilometre', value: '${mileage.toString()} km'));
-
-    if (items.isEmpty && (notes == null || notes.isEmpty)) return const SizedBox.shrink();
+    if (items.isEmpty) return const SizedBox.shrink();
 
     return Container(
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: const Color(0xFFD1FAE5)),
+        border: Border.all(color: const Color(0xFF6EE7B7)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -584,58 +554,91 @@ class _AdditionalInfoCard extends StatelessWidget {
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
             decoration: const BoxDecoration(
               color: Color(0xFFF0FDF4),
-              borderRadius: BorderRadius.vertical(top: Radius.circular(15)),
-              border: Border(bottom: BorderSide(color: Color(0xFFD1FAE5))),
+              borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
             ),
             child: const Row(
               children: [
-                Icon(Icons.verified_outlined, size: 18, color: AppColors.primary600),
-                SizedBox(width: 8),
-                Text('Müşteri Ek Bilgileri', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 14, color: Color(0xFF064E3B))),
+                Icon(Icons.check_circle_outline, size: 16, color: Color(0xFF16A34A)),
+                SizedBox(width: 6),
+                Text(
+                  'Müşteri Ek Bilgileri',
+                  style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: Color(0xFF15803D)),
+                ),
               ],
             ),
           ),
           Padding(
-            padding: const EdgeInsets.all(16),
+            padding: const EdgeInsets.all(12),
+            child: Column(
+              children: items.map((item) => Padding(
+                padding: const EdgeInsets.only(bottom: 8),
+                child: Row(
+                  children: [
+                    Container(
+                      width: 36,
+                      height: 36,
+                      decoration: BoxDecoration(
+                        color: AppColors.gray100,
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Icon(item.icon, size: 16, color: item.color),
+                    ),
+                    const SizedBox(width: 10),
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(item.label, style: const TextStyle(fontSize: 11, color: AppColors.gray400)),
+                        Text(item.value, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: AppColors.gray900)),
+                      ],
+                    ),
+                  ],
+                ),
+              )).toList(),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ─── AI card ──────────────────────────────────────────────────────────────────
+
+class _AiCard extends StatelessWidget {
+  final Map<String, dynamic> request;
+  const _AiCard({required this.request});
+
+  @override
+  Widget build(BuildContext context) {
+    final part = request['aiDetectedPart'] as String? ?? '';
+    final confidence = request['aiConfidence'] as num?;
+    final pct = confidence != null ? ' (%${(confidence * 100).round()} güven)' : '';
+
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: const Color(0xFFEFF6FF),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: const Color(0xFFBFDBFE)),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Icon(Icons.memory_outlined, size: 18, color: Color(0xFF2563EB)),
+          const SizedBox(width: 10),
+          Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                if (items.isNotEmpty)
-                  GridView.count(
-                    crossAxisCount: 2,
-                    shrinkWrap: true,
-                    physics: const NeverScrollableScrollPhysics(),
-                    childAspectRatio: 3.0,
-                    mainAxisSpacing: 8,
-                    crossAxisSpacing: 8,
-                    children: items.map((item) => Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-                      decoration: BoxDecoration(
-                        color: AppColors.gray50,
-                        borderRadius: BorderRadius.circular(10),
-                      ),
-                      child: Row(
-                        children: [
-                          Icon(item.icon, size: 16, color: AppColors.gray400),
-                          const SizedBox(width: 8),
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              children: [
-                                Text(item.label, style: const TextStyle(fontSize: 10, color: AppColors.gray400)),
-                                Text(item.value, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: AppColors.gray900)),
-                              ],
-                            ),
-                          ),
-                        ],
-                      ),
-                    )).toList(),
-                  ),
-                if (notes != null && notes.isNotEmpty) ...[
-                  if (items.isNotEmpty) const SizedBox(height: 10),
-                  Text('Not: $notes', style: const TextStyle(fontSize: 13, color: AppColors.gray600, height: 1.5)),
-                ],
+                const Text(
+                  'Yapay Zeka Tespiti',
+                  style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: Color(0xFF1D4ED8)),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  '$part$pct',
+                  style: const TextStyle(fontSize: 13, color: Color(0xFF3B82F6)),
+                ),
               ],
             ),
           ),
@@ -645,52 +648,62 @@ class _AdditionalInfoCard extends StatelessWidget {
   }
 }
 
-// ─── Job Updates Card ─────────────────────────────────────────────────────────
+// ─── Job log card ─────────────────────────────────────────────────────────────
 
-class _JobUpdatesCard extends StatelessWidget {
+class _JobLogCard extends StatelessWidget {
   final List<Map<String, dynamic>> updates;
-  final bool canUpdate;
-  final bool showForm;
-  final bool submitting;
-  final VoidCallback onShowForm;
-  final VoidCallback onCancelForm;
-  final Future<void> Function(Map<String, dynamic>) onSubmitUpdate;
+  const _JobLogCard({required this.updates});
 
-  const _JobUpdatesCard({
-    required this.updates,
-    required this.canUpdate,
-    required this.showForm,
-    required this.submitting,
-    required this.onShowForm,
-    required this.onCancelForm,
-    required this.onSubmitUpdate,
-  });
-
-  static const _kMonths = ['Oca', 'Şub', 'Mar', 'Nis', 'May', 'Haz', 'Tem', 'Ağu', 'Eyl', 'Eki', 'Kas', 'Ara'];
-
-  String _fmtDate(String? iso) {
+  String _formatDate(String? iso) {
     if (iso == null) return '';
     try {
-      final dt = DateTime.parse(iso);
-      return '${dt.day} ${_kMonths[dt.month - 1]} ${dt.year}';
+      final dt = DateTime.parse(iso).toLocal();
+      const months = ['Oca', 'Şub', 'Mar', 'Nis', 'May', 'Haz', 'Tem', 'Ağu', 'Eyl', 'Eki', 'Kas', 'Ara'];
+      return '${dt.day} ${months[dt.month - 1]} ${dt.year} ${dt.hour.toString().padLeft(2, '0')}:${dt.minute.toString().padLeft(2, '0')}';
     } catch (_) {
       return '';
     }
   }
 
-  String _typeLabel(String type) => switch (type) {
-    'progress' => 'İlerleme',
-    'delay' => 'Gecikme',
-    'completed' => 'Tamamlandı',
-    _ => type,
-  };
+  ({Color bg, Color border, Color text, Color headerBg, IconData icon, String label}) _typeConfig(String type) {
+    if (type == 'completed') {
+      return (
+        bg: const Color(0xFFDCFCE7),
+        border: const Color(0xFF6EE7B7),
+        text: const Color(0xFF059669),
+        headerBg: const Color(0xFFF0FDF4),
+        icon: Icons.check_circle_outline_rounded,
+        label: 'Tamamlandı',
+      );
+    }
+    if (type == 'delay') {
+      return (
+        bg: const Color(0xFFFFEDD5),
+        border: const Color(0xFFFDBA74),
+        text: const Color(0xFFEA580C),
+        headerBg: const Color(0xFFFFF7ED),
+        icon: Icons.access_time_rounded,
+        label: 'Gecikme',
+      );
+    }
+    return (
+      bg: const Color(0xFFDBEAFE),
+      border: const Color(0xFF93C5FD),
+      text: const Color(0xFF2563EB),
+      headerBg: const Color(0xFFEFF6FF),
+      icon: Icons.sync_rounded,
+      label: 'Güncelleme',
+    );
+  }
 
-  Color _typeColor(String type) => switch (type) {
-    'progress' => AppColors.blue600,
-    'delay' => AppColors.amber600,
-    'completed' => AppColors.primary600,
-    _ => AppColors.gray500,
-  };
+  String _formatCost(dynamic val) {
+    if (val == null) return '';
+    final num = double.tryParse(val.toString()) ?? 0;
+    return num.toStringAsFixed(0).replaceAllMapped(
+      RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'),
+      (m) => '${m[1]}.',
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -707,48 +720,38 @@ class _JobUpdatesCard extends StatelessWidget {
             padding: const EdgeInsets.fromLTRB(16, 14, 16, 14),
             child: Row(
               children: [
-                const Icon(Icons.list_alt_outlined, size: 18, color: AppColors.blue600),
-                const SizedBox(width: 8),
-                const Expanded(
-                  child: Text('İş Günlüğü', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 15, color: AppColors.gray900)),
+                const Icon(Icons.list_alt_outlined, size: 16, color: AppColors.primary600),
+                const SizedBox(width: 6),
+                const Text(
+                  'İş Günlüğü',
+                  style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: AppColors.gray900),
                 ),
-                if (canUpdate && !showForm)
-                  TextButton.icon(
-                    onPressed: onShowForm,
-                    icon: const Icon(Icons.add, size: 16),
-                    label: const Text('Güncelleme Ekle', style: TextStyle(fontSize: 13)),
-                    style: TextButton.styleFrom(foregroundColor: AppColors.blue600),
-                  ),
               ],
             ),
           ),
-          const Divider(height: 1, color: AppColors.gray200),
-          Padding(
-            padding: const EdgeInsets.all(16),
-            child: Column(
-              children: [
-                if (showForm) ...[
-                  _JobUpdateForm(
-                    submitting: submitting,
-                    onSubmit: onSubmitUpdate,
-                    onCancel: onCancelForm,
-                  ),
-                  if (updates.isNotEmpty) const SizedBox(height: 16),
-                ],
-                if (updates.isEmpty && !showForm)
-                  const Center(
-                    child: Padding(
-                      padding: EdgeInsets.symmetric(vertical: 16),
-                      child: Text('Henüz güncelleme eklenmedi.', style: TextStyle(fontSize: 13, color: AppColors.gray400)),
-                    ),
-                  ),
-                ...updates.asMap().entries.map((entry) {
-                  final i = entry.key;
-                  final update = entry.value;
-                  final type = update['updateType'] as String? ?? '';
+          const Divider(height: 1, color: AppColors.gray100),
+          if (updates.isEmpty)
+            const Padding(
+              padding: EdgeInsets.all(24),
+              child: Center(
+                child: Text('Henüz güncelleme eklenmedi', style: TextStyle(fontSize: 13, color: AppColors.gray400)),
+              ),
+            )
+          else
+            Padding(
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                children: List.generate(updates.length, (i) {
+                  final update = updates[i];
+                  final type = update['updateType'] as String? ?? 'progress';
+                  final cfg = _typeConfig(type);
                   final desc = update['description'] as String? ?? '';
-                  final date = update['createdAt'] as String?;
-                  final color = _typeColor(type);
+                  final parts = update['partsUsed'] as String?;
+                  final laborCost = update['laborCost'];
+                  final partsCost = update['partsCost'];
+                  final totalCost = update['totalCost'];
+                  final createdAt = update['createdAt'] as String?;
+                  final isLast = i == updates.length - 1;
 
                   return Row(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -756,77 +759,157 @@ class _JobUpdatesCard extends StatelessWidget {
                       Column(
                         children: [
                           Container(
-                            width: 28,
-                            height: 28,
+                            width: 36,
+                            height: 36,
                             decoration: BoxDecoration(
-                              color: color.withValues(alpha: 0.1),
+                              color: cfg.bg,
                               shape: BoxShape.circle,
+                              border: Border.all(color: cfg.border, width: 1.5),
                             ),
-                            child: Icon(
-                              type == 'completed' ? Icons.check : type == 'delay' ? Icons.warning_amber_outlined : Icons.update_outlined,
-                              size: 14,
-                              color: color,
-                            ),
+                            child: Icon(cfg.icon, size: 16, color: cfg.text),
                           ),
-                          if (i < updates.length - 1)
-                            Container(width: 2, height: 32, color: AppColors.gray200),
+                          if (!isLast)
+                            Container(width: 1.5, height: 24, color: AppColors.gray200),
                         ],
                       ),
                       const SizedBox(width: 12),
                       Expanded(
                         child: Padding(
-                          padding: EdgeInsets.only(bottom: i < updates.length - 1 ? 12 : 0),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Row(
-                                children: [
-                                  Container(
-                                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                                    decoration: BoxDecoration(
-                                      color: color.withValues(alpha: 0.1),
-                                      borderRadius: BorderRadius.circular(6),
-                                    ),
-                                    child: Text(_typeLabel(type), style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: color)),
+                          padding: EdgeInsets.only(bottom: isLast ? 0 : 16),
+                          child: Container(
+                            decoration: BoxDecoration(
+                              color: Colors.white,
+                              borderRadius: BorderRadius.circular(12),
+                              border: Border.all(color: cfg.border),
+                            ),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                                  decoration: BoxDecoration(
+                                    color: cfg.headerBg,
+                                    borderRadius: const BorderRadius.vertical(top: Radius.circular(12)),
                                   ),
-                                  const Spacer(),
-                                  if (date != null)
-                                    Text(_fmtDate(date), style: const TextStyle(fontSize: 11, color: AppColors.gray400)),
-                                ],
-                              ),
-                              const SizedBox(height: 4),
-                              Text(desc, style: const TextStyle(fontSize: 13, color: AppColors.gray700, height: 1.5)),
-                            ],
+                                  child: Row(
+                                    children: [
+                                      Text(cfg.label, style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: cfg.text)),
+                                      const Spacer(),
+                                      Text(_formatDate(createdAt), style: const TextStyle(fontSize: 11, color: AppColors.gray400)),
+                                    ],
+                                  ),
+                                ),
+                                Padding(
+                                  padding: const EdgeInsets.all(12),
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Text(desc, style: const TextStyle(fontSize: 13, color: AppColors.gray700, height: 1.4)),
+                                      if (parts != null && parts.isNotEmpty) ...[
+                                        const SizedBox(height: 8),
+                                        Row(
+                                          crossAxisAlignment: CrossAxisAlignment.start,
+                                          children: [
+                                            const Icon(Icons.build_outlined, size: 13, color: AppColors.gray400),
+                                            const SizedBox(width: 4),
+                                            Expanded(
+                                              child: Column(
+                                                crossAxisAlignment: CrossAxisAlignment.start,
+                                                children: [
+                                                  const Text('Kullanılan Parçalar', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: AppColors.gray500)),
+                                                  Text(parts, style: const TextStyle(fontSize: 12, color: AppColors.gray700)),
+                                                ],
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                      ],
+                                      if (totalCost != null || laborCost != null || partsCost != null) ...[
+                                        const SizedBox(height: 8),
+                                        Row(
+                                          children: [
+                                            if (laborCost != null)
+                                              Expanded(
+                                                child: Container(
+                                                  padding: const EdgeInsets.all(8),
+                                                  decoration: BoxDecoration(color: AppColors.gray50, borderRadius: BorderRadius.circular(8)),
+                                                  child: Column(
+                                                    children: [
+                                                      const Text('İşçilik', style: TextStyle(fontSize: 10, color: AppColors.gray400)),
+                                                      Text('${_formatCost(laborCost)} ₺', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: AppColors.gray900)),
+                                                    ],
+                                                  ),
+                                                ),
+                                              ),
+                                            if (laborCost != null && partsCost != null) const SizedBox(width: 6),
+                                            if (partsCost != null)
+                                              Expanded(
+                                                child: Container(
+                                                  padding: const EdgeInsets.all(8),
+                                                  decoration: BoxDecoration(color: AppColors.gray50, borderRadius: BorderRadius.circular(8)),
+                                                  child: Column(
+                                                    children: [
+                                                      const Text('Parça', style: TextStyle(fontSize: 10, color: AppColors.gray400)),
+                                                      Text('${_formatCost(partsCost)} ₺', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: AppColors.gray900)),
+                                                    ],
+                                                  ),
+                                                ),
+                                              ),
+                                            if ((laborCost != null || partsCost != null) && totalCost != null) const SizedBox(width: 6),
+                                            if (totalCost != null)
+                                              Expanded(
+                                                child: Container(
+                                                  padding: const EdgeInsets.all(8),
+                                                  decoration: BoxDecoration(
+                                                    color: const Color(0xFFF0FDF4),
+                                                    borderRadius: BorderRadius.circular(8),
+                                                    border: Border.all(color: const Color(0xFF6EE7B7)),
+                                                  ),
+                                                  child: Column(
+                                                    children: [
+                                                      const Text('Toplam', style: TextStyle(fontSize: 10, color: Color(0xFF059669))),
+                                                      Text('${_formatCost(totalCost)} ₺', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: Color(0xFF15803D))),
+                                                    ],
+                                                  ),
+                                                ),
+                                              ),
+                                          ],
+                                        ),
+                                      ],
+                                    ],
+                                  ),
+                                ),
+                              ],
+                            ),
                           ),
                         ),
                       ),
                     ],
                   );
                 }),
-              ],
+              ),
             ),
-          ),
         ],
       ),
     );
   }
 }
 
-// ─── Alert Card ───────────────────────────────────────────────────────────────
+// ─── Status banner ────────────────────────────────────────────────────────────
 
-class _AlertCard extends StatelessWidget {
+class _StatusBanner extends StatelessWidget {
   final IconData icon;
-  final Color iconColor;
+  final Color color;
   final Color bg;
   final String title;
-  final String description;
+  final String subtitle;
 
-  const _AlertCard({
+  const _StatusBanner({
     required this.icon,
-    required this.iconColor,
+    required this.color,
     required this.bg,
     required this.title,
-    required this.description,
+    required this.subtitle,
   });
 
   @override
@@ -836,20 +919,20 @@ class _AlertCard extends StatelessWidget {
       decoration: BoxDecoration(
         color: bg,
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: iconColor.withValues(alpha: 0.2)),
+        border: Border.all(color: color.withValues(alpha: 0.4)),
       ),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Icon(icon, size: 20, color: iconColor),
+          Icon(icon, size: 18, color: color),
           const SizedBox(width: 10),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(title, style: TextStyle(fontWeight: FontWeight.w600, fontSize: 14, color: iconColor)),
+                Text(title, style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: color)),
                 const SizedBox(height: 2),
-                Text(description, style: TextStyle(fontSize: 13, color: iconColor.withValues(alpha: 0.8))),
+                Text(subtitle, style: TextStyle(fontSize: 12, color: color.withValues(alpha: 0.8))),
               ],
             ),
           ),
@@ -859,179 +942,185 @@ class _AlertCard extends StatelessWidget {
   }
 }
 
-// ─── Action Buttons ───────────────────────────────────────────────────────────
+// ─── Small badge ──────────────────────────────────────────────────────────────
 
-class _ActionButtons extends StatelessWidget {
-  final bool canRequestInfo;
-  final bool dismissing;
-  final VoidCallback onDismiss;
-  final VoidCallback onRequestInfo;
-  final VoidCallback onBid;
+class _SmallBadge extends StatelessWidget {
+  final String label;
+  final Color bg;
+  final Color text;
+  final IconData? icon;
 
-  const _ActionButtons({
-    required this.canRequestInfo,
-    required this.dismissing,
-    required this.onDismiss,
-    required this.onRequestInfo,
-    required this.onBid,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Row(
-      children: [
-        OutlinedButton.icon(
-          onPressed: dismissing ? null : onDismiss,
-          icon: dismissing
-              ? const SizedBox(width: 14, height: 14, child: CircularProgressIndicator(strokeWidth: 2, color: AppColors.red700))
-              : const Icon(Icons.cancel_outlined, size: 18),
-          label: const Text('Reddet'),
-          style: OutlinedButton.styleFrom(
-            foregroundColor: AppColors.red700,
-            side: const BorderSide(color: AppColors.red700),
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-          ),
-        ),
-        const Spacer(),
-        if (canRequestInfo) ...[
-          OutlinedButton.icon(
-            onPressed: onRequestInfo,
-            icon: const Icon(Icons.info_outline, size: 18),
-            label: const Text('Ek Bilgi İste'),
-            style: OutlinedButton.styleFrom(
-              foregroundColor: AppColors.gray700,
-              side: const BorderSide(color: AppColors.gray300),
-              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-            ),
-          ),
-          const SizedBox(width: 8),
-        ],
-        ElevatedButton.icon(
-          onPressed: onBid,
-          icon: const Icon(Icons.send_outlined, size: 18),
-          label: const Text('Teklif Ver'),
-          style: ElevatedButton.styleFrom(
-            backgroundColor: AppColors.blue600,
-            foregroundColor: Colors.white,
-            padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-          ),
-        ),
-      ],
-    );
-  }
-}
-
-// ─── Bid Form ─────────────────────────────────────────────────────────────────
-
-class _BidForm extends StatefulWidget {
-  final bool submitting;
-  final Future<void> Function(num price, String? description, String? estimatedDuration) onSubmit;
-  final VoidCallback onCancel;
-
-  const _BidForm({required this.submitting, required this.onSubmit, required this.onCancel});
-
-  @override
-  State<_BidForm> createState() => _BidFormState();
-}
-
-class _BidFormState extends State<_BidForm> {
-  final _priceController = TextEditingController();
-  final _durationController = TextEditingController();
-  final _descController = TextEditingController();
-  final _formKey = GlobalKey<FormState>();
-
-  @override
-  void dispose() {
-    _priceController.dispose();
-    _durationController.dispose();
-    _descController.dispose();
-    super.dispose();
-  }
+  const _SmallBadge({required this.label, required this.bg, required this.text, this.icon});
 
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: AppColors.blue600.withValues(alpha: 0.3)),
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      decoration: BoxDecoration(color: bg, borderRadius: BorderRadius.circular(20)),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          if (icon != null) ...[
+            Icon(icon, size: 12, color: text),
+            const SizedBox(width: 4),
+          ],
+          Text(label, style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: text)),
+        ],
       ),
-      child: Form(
-        key: _formKey,
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
+    );
+  }
+}
+
+// ─── Action bar ───────────────────────────────────────────────────────────────
+
+class _ActionBar extends ConsumerWidget {
+  final ProviderRequestDetailState state;
+  final ProviderRequestDetailNotifier notifier;
+  final int requestId;
+
+  const _ActionBar({required this.state, required this.notifier, required this.requestId});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final busy = state.submittingBid || state.dismissing || state.requestingInfo;
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      decoration: const BoxDecoration(
+        color: Colors.white,
+        border: Border(top: BorderSide(color: AppColors.gray200)),
+      ),
+      child: Row(
+        children: [
+          GestureDetector(
+            onTap: busy ? null : () => _confirmDismiss(context, ref),
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+              decoration: BoxDecoration(
+                color: const Color(0xFFFEF2F2),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: const Color(0xFFFCA5A5)),
+              ),
+              child: state.dismissing
+                  ? const SizedBox(
+                      width: 16, height: 16,
+                      child: CircularProgressIndicator(strokeWidth: 2, color: Color(0xFFDC2626)),
+                    )
+                  : const Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(Icons.cancel_outlined, size: 16, color: Color(0xFFDC2626)),
+                        SizedBox(width: 6),
+                        Text('Reddet', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: Color(0xFFDC2626))),
+                      ],
+                    ),
+            ),
+          ),
+          const SizedBox(width: 8),
+          if (state.canRequestInfo) ...[
+            Expanded(
+              child: GestureDetector(
+                onTap: busy ? null : () => _showInfoSheet(context),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(vertical: 12),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: AppColors.gray300),
+                  ),
+                  child: const Center(
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(Icons.info_outline_rounded, size: 16, color: AppColors.gray700),
+                        SizedBox(width: 6),
+                        Text('Ek Bilgi İste', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: AppColors.gray700)),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(width: 8),
+          ],
+          Expanded(
+            child: GestureDetector(
+              onTap: busy ? null : () => _showBidSheet(context),
+              child: Container(
+                padding: const EdgeInsets.symmetric(vertical: 12),
+                decoration: BoxDecoration(
+                  color: AppColors.primary600,
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: const Center(
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(Icons.send_rounded, size: 16, color: Colors.white),
+                      SizedBox(width: 6),
+                      Text('Teklif Ver', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: Colors.white)),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _confirmDismiss(BuildContext context, WidgetRef ref) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        contentPadding: const EdgeInsets.all(20),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
           children: [
-            const Row(
-              children: [
-                Icon(Icons.send_outlined, size: 18, color: AppColors.blue600),
-                SizedBox(width: 8),
-                Text('Teklif Ver', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 15, color: AppColors.gray900)),
-              ],
+            Container(
+              width: 48,
+              height: 48,
+              decoration: BoxDecoration(
+                color: const Color(0xFFFEE2E2),
+                borderRadius: BorderRadius.circular(24),
+              ),
+              child: const Icon(Icons.cancel_outlined, size: 24, color: Color(0xFFDC2626)),
             ),
             const SizedBox(height: 16),
-            TextFormField(
-              controller: _priceController,
-              keyboardType: const TextInputType.numberWithOptions(decimal: true),
-              decoration: _inputDecoration('Fiyat (₺)', hint: 'Örn: 1500'),
-              validator: (v) {
-                if (v == null || v.trim().isEmpty) return 'Fiyat zorunlu';
-                if (num.tryParse(v.trim()) == null) return 'Geçerli bir sayı girin';
-                return null;
-              },
+            const Text(
+              'Talebi Reddet',
+              style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: AppColors.gray900),
             ),
-            const SizedBox(height: 12),
-            TextFormField(
-              controller: _durationController,
-              decoration: _inputDecoration('Tahmini Süre', hint: 'Örn: 2-3 iş günü'),
+            const SizedBox(height: 8),
+            const Text(
+              'Bu talep listenizden kaldırılacak. Müşteri bilgilendirilmeyecek.',
+              style: TextStyle(fontSize: 13, color: AppColors.gray500, height: 1.4),
+              textAlign: TextAlign.center,
             ),
-            const SizedBox(height: 12),
-            TextFormField(
-              controller: _descController,
-              maxLines: 3,
-              decoration: _inputDecoration('Açıklama', hint: 'Müşteriye iletmek istediğiniz bilgiler...'),
-            ),
-            const SizedBox(height: 16),
+            const SizedBox(height: 20),
             Row(
               children: [
                 Expanded(
                   child: OutlinedButton(
-                    onPressed: widget.submitting ? null : widget.onCancel,
+                    onPressed: () => Navigator.of(dialogContext).pop(false),
                     style: OutlinedButton.styleFrom(
-                      foregroundColor: AppColors.gray600,
                       side: const BorderSide(color: AppColors.gray300),
-                      padding: const EdgeInsets.symmetric(vertical: 12),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                      foregroundColor: AppColors.gray700,
                     ),
                     child: const Text('Vazgeç'),
                   ),
                 ),
-                const SizedBox(width: 12),
+                const SizedBox(width: 10),
                 Expanded(
                   child: ElevatedButton(
-                    onPressed: widget.submitting
-                        ? null
-                        : () {
-                            if (_formKey.currentState!.validate()) {
-                              widget.onSubmit(
-                                num.parse(_priceController.text.trim()),
-                                _descController.text.trim().isEmpty ? null : _descController.text.trim(),
-                                _durationController.text.trim().isEmpty ? null : _durationController.text.trim(),
-                              );
-                            }
-                          },
+                    onPressed: () => Navigator.of(dialogContext).pop(true),
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: AppColors.blue600,
+                      backgroundColor: const Color(0xFFDC2626),
                       foregroundColor: Colors.white,
-                      padding: const EdgeInsets.symmetric(vertical: 12),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                     ),
-                    child: widget.submitting
-                        ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
-                        : const Text('Teklif Gönder'),
+                    child: const Text('Evet, Reddet'),
                   ),
                 ),
               ],
@@ -1040,39 +1129,285 @@ class _BidFormState extends State<_BidForm> {
         ),
       ),
     );
+
+    if (confirmed == true && context.mounted) {
+      final ok = await notifier.dismissRequest();
+      if (ok && context.mounted) {
+        ref.invalidate(providerOpenRequestsProvider);
+        context.pop();
+      }
+    }
   }
 
-  InputDecoration _inputDecoration(String label, {String? hint}) => InputDecoration(
-    labelText: label,
-    hintText: hint,
-    border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: const BorderSide(color: AppColors.gray200)),
-    enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: const BorderSide(color: AppColors.gray200)),
-    focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: const BorderSide(color: AppColors.blue600)),
-    contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-    labelStyle: const TextStyle(fontSize: 14, color: AppColors.gray500),
-  );
+  Future<void> _showBidSheet(BuildContext context) async {
+    await showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (_) => _BidSheet(notifier: notifier),
+    );
+  }
+
+  Future<void> _showInfoSheet(BuildContext context) async {
+    await showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (_) => _InfoRequestSheet(notifier: notifier),
+    );
+  }
 }
 
-// ─── Info Request Form ────────────────────────────────────────────────────────
+// ─── Bid bottom sheet ─────────────────────────────────────────────────────────
 
-class _InfoRequestForm extends StatefulWidget {
-  final bool submitting;
-  final Future<void> Function(Map<String, dynamic>) onSubmit;
-  final VoidCallback onCancel;
-
-  const _InfoRequestForm({required this.submitting, required this.onSubmit, required this.onCancel});
+class _BidSheet extends StatefulWidget {
+  final ProviderRequestDetailNotifier notifier;
+  const _BidSheet({required this.notifier});
 
   @override
-  State<_InfoRequestForm> createState() => _InfoRequestFormState();
+  State<_BidSheet> createState() => _BidSheetState();
 }
 
-class _InfoRequestFormState extends State<_InfoRequestForm> {
+class _BidSheetState extends State<_BidSheet> {
+  final _priceController = TextEditingController();
+  final _descController = TextEditingController();
+  String _selectedDuration = '';
+  bool _submitting = false;
+
+  static const _durations = ['1 saat', '2-3 saat', 'Yarım gün', '1 gün', '2-3 gün', '1 hafta'];
+
+  bool get _isValid {
+    final price = int.tryParse(_priceController.text.replaceAll(RegExp(r'[^0-9]'), ''));
+    return price != null && price > 0;
+  }
+
+  Future<void> _submit() async {
+    final price = int.tryParse(_priceController.text.replaceAll(RegExp(r'[^0-9]'), ''));
+    if (price == null || price <= 0) return;
+
+    setState(() => _submitting = true);
+    final ok = await widget.notifier.submitBid(
+      price: price,
+      description: _descController.text.trim().isEmpty ? null : _descController.text.trim(),
+      estimatedDuration: _selectedDuration.isEmpty ? null : _selectedDuration,
+    );
+    if (mounted) {
+      setState(() => _submitting = false);
+      if (ok) {
+        Navigator.of(context).pop();
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Teklifiniz gönderildi'), backgroundColor: Color(0xFF16A34A)),
+        );
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Teklif gönderilemedi'), backgroundColor: Color(0xFFDC2626)),
+        );
+      }
+    }
+  }
+
+  @override
+  void dispose() {
+    _priceController.dispose();
+    _descController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final bottom = MediaQuery.of(context).viewInsets.bottom;
+    final screenHeight = MediaQuery.of(context).size.height;
+    return Container(
+      constraints: BoxConstraints(maxHeight: screenHeight * 0.9),
+      decoration: const BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(20, 20, 20, 0),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Center(
+                  child: Container(
+                    width: 36, height: 4,
+                    decoration: BoxDecoration(color: AppColors.gray200, borderRadius: BorderRadius.circular(99)),
+                  ),
+                ),
+                const SizedBox(height: 20),
+                const Text('Teklif Ver', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700, color: AppColors.gray900)),
+                const SizedBox(height: 20),
+              ],
+            ),
+          ),
+          Flexible(
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.symmetric(horizontal: 20),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text('Teklif Fiyatı *', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: AppColors.gray700)),
+                  const SizedBox(height: 6),
+                  TextField(
+                    controller: _priceController,
+                    keyboardType: TextInputType.number,
+                    style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w700, color: AppColors.gray900),
+                    decoration: InputDecoration(
+                      hintText: '0',
+                      hintStyle: const TextStyle(color: AppColors.gray300, fontWeight: FontWeight.w400, fontSize: 22),
+                      suffixText: '₺',
+                      suffixStyle: const TextStyle(fontSize: 20, fontWeight: FontWeight.w700, color: AppColors.gray400),
+                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: AppColors.gray200)),
+                      focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: AppColors.primary600, width: 1.5)),
+                      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                    ),
+                    onChanged: (_) => setState(() {}),
+                  ),
+                  const SizedBox(height: 6),
+                  const Text('KDV dahil toplam tutar', style: TextStyle(fontSize: 12, color: AppColors.gray400)),
+                  const SizedBox(height: 16),
+                  const Text('Tahmini Süre', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: AppColors.gray700)),
+                  const SizedBox(height: 8),
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 6,
+                    children: _durations.map((d) {
+                      final active = _selectedDuration == d;
+                      return GestureDetector(
+                        onTap: () => setState(() => _selectedDuration = active ? '' : d),
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+                          decoration: BoxDecoration(
+                            color: active ? AppColors.primary600 : Colors.white,
+                            borderRadius: BorderRadius.circular(8),
+                            border: Border.all(color: active ? AppColors.primary600 : AppColors.gray300),
+                          ),
+                          child: Text(
+                            d,
+                            style: TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w500,
+                              color: active ? Colors.white : AppColors.gray600,
+                            ),
+                          ),
+                        ),
+                      );
+                    }).toList(),
+                  ),
+                  const SizedBox(height: 16),
+                  const Text('Kapsam & Açıklama', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: AppColors.gray700)),
+                  const SizedBox(height: 6),
+                  TextField(
+                    controller: _descController,
+                    maxLines: 4,
+                    decoration: InputDecoration(
+                      hintText: 'Yapılacak işlemleri, kullanılacak parçaları ve garantiyi açıklayın...',
+                      hintStyle: const TextStyle(fontSize: 13, color: AppColors.gray400),
+                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: AppColors.gray200)),
+                      focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: AppColors.primary600, width: 1.5)),
+                      contentPadding: const EdgeInsets.all(14),
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                ],
+              ),
+            ),
+          ),
+          Padding(
+            padding: EdgeInsets.fromLTRB(20, 12, 20, 20 + bottom),
+            child: Row(
+              children: [
+                Expanded(
+                  child: OutlinedButton(
+                    onPressed: _submitting ? null : () => Navigator.of(context).pop(),
+                    style: OutlinedButton.styleFrom(
+                      side: const BorderSide(color: AppColors.gray300),
+                      foregroundColor: AppColors.gray600,
+                      padding: const EdgeInsets.symmetric(vertical: 14),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    ),
+                    child: const Text('İptal'),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  flex: 2,
+                  child: ElevatedButton(
+                    onPressed: _submitting || !_isValid ? null : _submit,
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppColors.primary600,
+                      foregroundColor: Colors.white,
+                      disabledBackgroundColor: AppColors.gray200,
+                      padding: const EdgeInsets.symmetric(vertical: 14),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    ),
+                    child: _submitting
+                        ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                        : const Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(Icons.send_rounded, size: 16),
+                              SizedBox(width: 6),
+                              Text('Teklif Gönder', style: TextStyle(fontWeight: FontWeight.w600)),
+                            ],
+                          ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ─── Info request bottom sheet ────────────────────────────────────────────────
+
+class _InfoRequestSheet extends StatefulWidget {
+  final ProviderRequestDetailNotifier notifier;
+  const _InfoRequestSheet({required this.notifier});
+
+  @override
+  State<_InfoRequestSheet> createState() => _InfoRequestSheetState();
+}
+
+class _InfoRequestSheetState extends State<_InfoRequestSheet> {
   bool _engineDisplacement = false;
   bool _fuelType = false;
   bool _transmissionType = false;
   bool _bodyType = false;
   bool _mileage = false;
   final _notesController = TextEditingController();
+  bool _submitting = false;
+
+  bool get _isValid => _engineDisplacement || _fuelType || _transmissionType || _bodyType || _mileage || _notesController.text.trim().isNotEmpty;
+
+  Future<void> _submit() async {
+    setState(() => _submitting = true);
+    final ok = await widget.notifier.requestInfo({
+      if (_engineDisplacement) 'engineDisplacement': true,
+      if (_fuelType) 'fuelType': true,
+      if (_transmissionType) 'transmissionType': true,
+      if (_bodyType) 'bodyType': true,
+      if (_mileage) 'mileage': true,
+      if (_notesController.text.trim().isNotEmpty) 'additionalNotes': _notesController.text.trim(),
+    });
+    if (mounted) {
+      setState(() => _submitting = false);
+      Navigator.of(context).pop();
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(ok ? 'Ek bilgi talebi gönderildi' : 'İşlem başarısız'),
+          backgroundColor: ok ? const Color(0xFF16A34A) : const Color(0xFFDC2626),
+        ),
+      );
+    }
+  }
 
   @override
   void dispose() {
@@ -1080,432 +1415,145 @@ class _InfoRequestFormState extends State<_InfoRequestForm> {
     super.dispose();
   }
 
-  @override
-  Widget build(BuildContext context) {
-    final anySelected = _engineDisplacement || _fuelType || _transmissionType || _bodyType || _mileage;
-
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: AppColors.gray200),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Row(
-            children: [
-              Icon(Icons.info_outline, size: 18, color: AppColors.gray700),
-              SizedBox(width: 8),
-              Text('Ek Bilgi İste', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 15, color: AppColors.gray900)),
-            ],
-          ),
-          const SizedBox(height: 4),
-          const Text('Müşteriden istediğiniz bilgileri seçin:', style: TextStyle(fontSize: 13, color: AppColors.gray500)),
-          const SizedBox(height: 12),
-          _CheckItem(label: 'Motor Hacmi', value: _engineDisplacement, onChanged: (v) => setState(() => _engineDisplacement = v!)),
-          _CheckItem(label: 'Yakıt Türü', value: _fuelType, onChanged: (v) => setState(() => _fuelType = v!)),
-          _CheckItem(label: 'Vites Tipi', value: _transmissionType, onChanged: (v) => setState(() => _transmissionType = v!)),
-          _CheckItem(label: 'Kasa Tipi', value: _bodyType, onChanged: (v) => setState(() => _bodyType = v!)),
-          _CheckItem(label: 'Kilometre', value: _mileage, onChanged: (v) => setState(() => _mileage = v!)),
-          const SizedBox(height: 12),
-          TextField(
-            controller: _notesController,
-            maxLines: 2,
-            decoration: InputDecoration(
-              labelText: 'Ek Not (isteğe bağlı)',
-              hintText: 'Müşteriye özel not ekleyin...',
-              border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: const BorderSide(color: AppColors.gray200)),
-              enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: const BorderSide(color: AppColors.gray200)),
-              focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: const BorderSide(color: AppColors.blue600)),
-              contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-              labelStyle: const TextStyle(fontSize: 14, color: AppColors.gray500),
-            ),
-          ),
-          const SizedBox(height: 16),
-          Row(
-            children: [
-              Expanded(
-                child: OutlinedButton(
-                  onPressed: widget.submitting ? null : widget.onCancel,
-                  style: OutlinedButton.styleFrom(
-                    foregroundColor: AppColors.gray600,
-                    side: const BorderSide(color: AppColors.gray300),
-                    padding: const EdgeInsets.symmetric(vertical: 12),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                  ),
-                  child: const Text('Vazgeç'),
-                ),
+  Widget _checkRow(String label, bool value, void Function(bool) onChanged) {
+    return InkWell(
+      onTap: () => setState(() => onChanged(!value)),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 10),
+        child: Row(
+          children: [
+            Container(
+              width: 22, height: 22,
+              decoration: BoxDecoration(
+                color: value ? AppColors.primary600 : Colors.white,
+                borderRadius: BorderRadius.circular(6),
+                border: Border.all(color: value ? AppColors.primary600 : AppColors.gray300, width: 1.5),
               ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: ElevatedButton(
-                  onPressed: widget.submitting || !anySelected
-                      ? null
-                      : () {
-                          widget.onSubmit({
-                            'engineDisplacement': _engineDisplacement,
-                            'fuelType': _fuelType,
-                            'transmissionType': _transmissionType,
-                            'bodyType': _bodyType,
-                            'mileage': _mileage,
-                            if (_notesController.text.trim().isNotEmpty)
-                              'additionalNotes': _notesController.text.trim(),
-                          });
-                        },
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: AppColors.gray900,
-                    foregroundColor: Colors.white,
-                    padding: const EdgeInsets.symmetric(vertical: 12),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                  ),
-                  child: widget.submitting
-                      ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
-                      : const Text('Gönder'),
-                ),
-              ),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _CheckItem extends StatelessWidget {
-  final String label;
-  final bool value;
-  final ValueChanged<bool?> onChanged;
-
-  const _CheckItem({required this.label, required this.value, required this.onChanged});
-
-  @override
-  Widget build(BuildContext context) {
-    return CheckboxListTile(
-      value: value,
-      onChanged: onChanged,
-      title: Text(label, style: const TextStyle(fontSize: 14, color: AppColors.gray700)),
-      activeColor: AppColors.blue600,
-      controlAffinity: ListTileControlAffinity.leading,
-      contentPadding: EdgeInsets.zero,
-      dense: true,
-    );
-  }
-}
-
-// ─── Job Update Form ──────────────────────────────────────────────────────────
-
-class _JobUpdateForm extends StatefulWidget {
-  final bool submitting;
-  final Future<void> Function(Map<String, dynamic>) onSubmit;
-  final VoidCallback onCancel;
-
-  const _JobUpdateForm({required this.submitting, required this.onSubmit, required this.onCancel});
-
-  @override
-  State<_JobUpdateForm> createState() => _JobUpdateFormState();
-}
-
-class _JobUpdateFormState extends State<_JobUpdateForm> {
-  String _updateType = 'progress';
-  final _descController = TextEditingController();
-  final _delayReasonController = TextEditingController();
-
-  @override
-  void dispose() {
-    _descController.dispose();
-    _delayReasonController.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: AppColors.gray50,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: AppColors.gray200),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Text('Güncelleme Ekle', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 14, color: AppColors.gray900)),
-          const SizedBox(height: 12),
-          SegmentedButton<String>(
-            segments: const [
-              ButtonSegment(value: 'progress', label: Text('İlerleme'), icon: Icon(Icons.update_outlined, size: 16)),
-              ButtonSegment(value: 'delay', label: Text('Gecikme'), icon: Icon(Icons.warning_amber_outlined, size: 16)),
-              ButtonSegment(value: 'completed', label: Text('Tamamlandı'), icon: Icon(Icons.check_circle_outline, size: 16)),
-            ],
-            selected: {_updateType},
-            onSelectionChanged: (v) => setState(() => _updateType = v.first),
-            style: ButtonStyle(
-              textStyle: WidgetStateProperty.all(const TextStyle(fontSize: 12)),
-              visualDensity: VisualDensity.compact,
+              child: value ? const Icon(Icons.check_rounded, size: 14, color: Colors.white) : null,
             ),
-          ),
-          const SizedBox(height: 12),
-          TextField(
-            controller: _descController,
-            maxLines: 3,
-            decoration: InputDecoration(
-              labelText: 'Açıklama *',
-              hintText: 'Yapılan işlem veya durum hakkında bilgi verin...',
-              border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: const BorderSide(color: AppColors.gray200)),
-              enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: const BorderSide(color: AppColors.gray200)),
-              focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: const BorderSide(color: AppColors.blue600)),
-              contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-              labelStyle: const TextStyle(fontSize: 14, color: AppColors.gray500),
-              filled: true,
-              fillColor: Colors.white,
-            ),
-          ),
-          if (_updateType == 'delay') ...[
-            const SizedBox(height: 12),
-            TextField(
-              controller: _delayReasonController,
-              decoration: InputDecoration(
-                labelText: 'Gecikme Nedeni',
-                border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: const BorderSide(color: AppColors.gray200)),
-                enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: const BorderSide(color: AppColors.gray200)),
-                focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: const BorderSide(color: AppColors.blue600)),
-                contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-                labelStyle: const TextStyle(fontSize: 14, color: AppColors.gray500),
-                filled: true,
-                fillColor: Colors.white,
-              ),
-            ),
+            const SizedBox(width: 12),
+            Text(label, style: const TextStyle(fontSize: 14, color: AppColors.gray900)),
           ],
-          const SizedBox(height: 14),
-          Row(
-            children: [
-              Expanded(
-                child: OutlinedButton(
-                  onPressed: widget.submitting ? null : widget.onCancel,
-                  style: OutlinedButton.styleFrom(
-                    foregroundColor: AppColors.gray600,
-                    side: const BorderSide(color: AppColors.gray300),
-                    padding: const EdgeInsets.symmetric(vertical: 10),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                  ),
-                  child: const Text('Vazgeç'),
-                ),
-              ),
-              const SizedBox(width: 10),
-              Expanded(
-                child: ElevatedButton(
-                  onPressed: widget.submitting
-                      ? null
-                      : () {
-                          final desc = _descController.text.trim();
-                          if (desc.isEmpty) return;
-                          final data = <String, dynamic>{
-                            'updateType': _updateType,
-                            'description': desc,
-                            if (_updateType == 'delay' && _delayReasonController.text.trim().isNotEmpty)
-                              'delayReason': _delayReasonController.text.trim(),
-                          };
-                          widget.onSubmit(data);
-                        },
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: AppColors.blue600,
-                    foregroundColor: Colors.white,
-                    padding: const EdgeInsets.symmetric(vertical: 10),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                  ),
-                  child: widget.submitting
-                      ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
-                      : const Text('Gönder'),
-                ),
-              ),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-// ─── Complete Job Button ──────────────────────────────────────────────────────
-
-class _CompleteJobButton extends StatelessWidget {
-  final VoidCallback onTap;
-
-  const _CompleteJobButton({required this.onTap});
-
-  @override
-  Widget build(BuildContext context) {
-    return SizedBox(
-      width: double.infinity,
-      child: ElevatedButton.icon(
-        onPressed: onTap,
-        icon: const Icon(Icons.check_circle_outline, size: 18),
-        label: const Text('İşi Tamamla', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600)),
-        style: ElevatedButton.styleFrom(
-          backgroundColor: AppColors.primary600,
-          foregroundColor: Colors.white,
-          padding: const EdgeInsets.symmetric(vertical: 14),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-          elevation: 0,
         ),
       ),
     );
   }
-}
-
-// ─── Complete Job Form ────────────────────────────────────────────────────────
-
-class _CompleteJobForm extends StatefulWidget {
-  final bool submitting;
-  final Future<void> Function(Map<String, dynamic> data) onSubmit;
-  final VoidCallback onCancel;
-
-  const _CompleteJobForm({
-    required this.submitting,
-    required this.onSubmit,
-    required this.onCancel,
-  });
-
-  @override
-  State<_CompleteJobForm> createState() => _CompleteJobFormState();
-}
-
-class _CompleteJobFormState extends State<_CompleteJobForm> {
-  final _workDoneCtrl = TextEditingController();
-  final _partsUsedCtrl = TextEditingController();
-  final _laborCostCtrl = TextEditingController();
-  final _partsCostCtrl = TextEditingController();
-  final _totalCostCtrl = TextEditingController();
-
-  @override
-  void dispose() {
-    _workDoneCtrl.dispose();
-    _partsUsedCtrl.dispose();
-    _laborCostCtrl.dispose();
-    _partsCostCtrl.dispose();
-    _totalCostCtrl.dispose();
-    super.dispose();
-  }
 
   @override
   Widget build(BuildContext context) {
+    final bottom = MediaQuery.of(context).viewInsets.bottom;
+    final screenHeight = MediaQuery.of(context).size.height;
     return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
+      constraints: BoxConstraints(maxHeight: screenHeight * 0.9),
+      decoration: const BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: AppColors.primary600, width: 1.5),
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
       child: Column(
+        mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Row(
-            children: [
-              Icon(Icons.check_circle_outline, color: AppColors.primary600, size: 18),
-              SizedBox(width: 8),
-              Text('İşi Tamamla', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700, color: AppColors.gray900)),
-            ],
-          ),
-          const SizedBox(height: 14),
-          TextField(
-            controller: _workDoneCtrl,
-            maxLines: 3,
-            decoration: _fieldDecoration('Yapılan İşler *', 'Örn: Ön fren balataları değiştirildi, disk kontrol edildi...'),
-          ),
-          const SizedBox(height: 10),
-          TextField(
-            controller: _partsUsedCtrl,
-            decoration: _fieldDecoration('Kullanılan Parçalar', 'Örn: Bosch balata seti, 2 adet'),
-          ),
-          const SizedBox(height: 10),
-          Row(
-            children: [
-              Expanded(
-                child: TextField(
-                  controller: _laborCostCtrl,
-                  keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                  decoration: _fieldDecoration('İşçilik (₺)', 'Örn: 300'),
-                ),
-              ),
-              const SizedBox(width: 10),
-              Expanded(
-                child: TextField(
-                  controller: _partsCostCtrl,
-                  keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                  decoration: _fieldDecoration('Parça (₺)', 'Örn: 750'),
-                ),
-              ),
-              const SizedBox(width: 10),
-              Expanded(
-                child: TextField(
-                  controller: _totalCostCtrl,
-                  keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                  decoration: _fieldDecoration('Toplam (₺)', 'Örn: 1050'),
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 14),
-          Row(
-            children: [
-              Expanded(
-                child: OutlinedButton(
-                  onPressed: widget.submitting ? null : widget.onCancel,
-                  style: OutlinedButton.styleFrom(
-                    foregroundColor: AppColors.gray600,
-                    side: const BorderSide(color: AppColors.gray300),
-                    padding: const EdgeInsets.symmetric(vertical: 10),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(20, 20, 20, 0),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Center(
+                  child: Container(
+                    width: 36, height: 4,
+                    decoration: BoxDecoration(color: AppColors.gray200, borderRadius: BorderRadius.circular(99)),
                   ),
-                  child: const Text('Vazgeç'),
                 ),
-              ),
-              const SizedBox(width: 10),
-              Expanded(
-                child: ElevatedButton(
-                  onPressed: widget.submitting
-                      ? null
-                      : () {
-                          final workDone = _workDoneCtrl.text.trim();
-                          if (workDone.isEmpty) return;
-                          widget.onSubmit({
-                            'workDone': workDone,
-                            'partsUsed': _partsUsedCtrl.text.trim().isEmpty ? null : _partsUsedCtrl.text.trim(),
-                            'laborCost': num.tryParse(_laborCostCtrl.text.trim()),
-                            'partsCost': num.tryParse(_partsCostCtrl.text.trim()),
-                            'totalCost': num.tryParse(_totalCostCtrl.text.trim()),
-                          });
-                        },
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: AppColors.primary600,
-                    foregroundColor: Colors.white,
-                    padding: const EdgeInsets.symmetric(vertical: 10),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                const SizedBox(height: 20),
+                const Text('Ek Bilgi İste', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700, color: AppColors.gray900)),
+                const SizedBox(height: 4),
+                const Text('Müşteriden istediğiniz bilgileri seçin', style: TextStyle(fontSize: 13, color: AppColors.gray500)),
+                const SizedBox(height: 16),
+              ],
+            ),
+          ),
+          Flexible(
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.symmetric(horizontal: 20),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Divider(height: 1, color: AppColors.gray100),
+                  _checkRow('Motor Hacmi', _engineDisplacement, (v) => _engineDisplacement = v),
+                  const Divider(height: 1, color: AppColors.gray100),
+                  _checkRow('Yakıt Türü', _fuelType, (v) => _fuelType = v),
+                  const Divider(height: 1, color: AppColors.gray100),
+                  _checkRow('Vites Tipi', _transmissionType, (v) => _transmissionType = v),
+                  const Divider(height: 1, color: AppColors.gray100),
+                  _checkRow('Kasa Tipi', _bodyType, (v) => _bodyType = v),
+                  const Divider(height: 1, color: AppColors.gray100),
+                  _checkRow('Kilometre', _mileage, (v) => _mileage = v),
+                  const Divider(height: 1, color: AppColors.gray100),
+                  const SizedBox(height: 14),
+                  const Text('Ek Notlar', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: AppColors.gray700)),
+                  const SizedBox(height: 6),
+                  TextField(
+                    controller: _notesController,
+                    maxLines: 3,
+                    onChanged: (_) => setState(() {}),
+                    decoration: InputDecoration(
+                      hintText: 'Müşteriye iletmek istediğiniz ek notlar...',
+                      hintStyle: const TextStyle(fontSize: 13, color: AppColors.gray400),
+                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: AppColors.gray200)),
+                      focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: AppColors.primary600, width: 1.5)),
+                      contentPadding: const EdgeInsets.all(12),
+                    ),
                   ),
-                  child: widget.submitting
-                      ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
-                      : const Text('Tamamla'),
-                ),
+                  const SizedBox(height: 8),
+                ],
               ),
-            ],
+            ),
+          ),
+          Padding(
+            padding: EdgeInsets.fromLTRB(20, 12, 20, 20 + bottom),
+            child: Row(
+              children: [
+                Expanded(
+                  child: OutlinedButton(
+                    onPressed: _submitting ? null : () => Navigator.of(context).pop(),
+                    style: OutlinedButton.styleFrom(
+                      side: const BorderSide(color: AppColors.gray300),
+                      foregroundColor: AppColors.gray600,
+                      padding: const EdgeInsets.symmetric(vertical: 14),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    ),
+                    child: const Text('İptal'),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  flex: 2,
+                  child: ElevatedButton(
+                    onPressed: _submitting || !_isValid ? null : _submit,
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppColors.primary600,
+                      foregroundColor: Colors.white,
+                      disabledBackgroundColor: AppColors.gray200,
+                      padding: const EdgeInsets.symmetric(vertical: 14),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    ),
+                    child: _submitting
+                        ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                        : const Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(Icons.info_outline_rounded, size: 16),
+                              SizedBox(width: 6),
+                              Text('Gönder', style: TextStyle(fontWeight: FontWeight.w600)),
+                            ],
+                          ),
+                  ),
+                ),
+              ],
+            ),
           ),
         ],
       ),
     );
   }
-
-  InputDecoration _fieldDecoration(String label, String hint) => InputDecoration(
-    labelText: label,
-    hintText: hint,
-    border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: const BorderSide(color: AppColors.gray200)),
-    enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: const BorderSide(color: AppColors.gray200)),
-    focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: const BorderSide(color: AppColors.primary600)),
-    contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-    labelStyle: const TextStyle(fontSize: 13, color: AppColors.gray500),
-    hintStyle: const TextStyle(fontSize: 12, color: AppColors.gray400),
-    filled: true,
-    fillColor: Colors.white,
-  );
 }

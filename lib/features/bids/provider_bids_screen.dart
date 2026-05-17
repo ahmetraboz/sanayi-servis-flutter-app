@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 import '../../../core/theme/theme.dart';
 import '../../../shared/widgets/page_header.dart';
 import '../../../shared/widgets/shared_pagination.dart';
+import '../../../shared/widgets/skeleton.dart';
 import 'provider_bids_notifier.dart';
 
 const _tabs = [
@@ -63,7 +64,7 @@ class ProviderBidsScreen extends ConsumerWidget {
 
   Widget _buildBody(BuildContext context, ProviderBidsState state, ProviderBidsNotifier notifier) {
     if (state.loading && state.bids.isEmpty) {
-      return const Center(child: CircularProgressIndicator(color: AppColors.blue600, strokeWidth: 2));
+      return const _BidListSkeleton();
     }
 
     if (state.error != null && state.bids.isEmpty) {
@@ -443,6 +444,51 @@ class _RequestStatusBadge extends StatelessWidget {
         borderRadius: BorderRadius.circular(6),
       ),
       child: Text(label, style: const TextStyle(fontSize: 11, color: AppColors.gray500)),
+    );
+  }
+}
+
+class _BidListSkeleton extends StatelessWidget {
+  const _BidListSkeleton();
+
+  @override
+  Widget build(BuildContext context) {
+    return ListView.builder(
+      padding: const EdgeInsets.all(16),
+      itemCount: 5,
+      itemBuilder: (context, index) => Container(
+        margin: const EdgeInsets.only(bottom: 12),
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: AppColors.gray200),
+        ),
+        child: const Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Expanded(child: SkeletonBox(height: 15, radius: 5)),
+                SizedBox(width: 40),
+                SkeletonBox(height: 22, width: 80, radius: 5),
+              ],
+            ),
+            SizedBox(height: 10),
+            SkeletonBox(height: 12, width: 200, radius: 4),
+            SizedBox(height: 8),
+            SkeletonBox(height: 12, width: 140, radius: 4),
+            SizedBox(height: 12),
+            Row(
+              children: [
+                SkeletonBox(height: 22, width: 90, radius: 6),
+                SizedBox(width: 6),
+                SkeletonBox(height: 22, width: 80, radius: 6),
+              ],
+            ),
+          ],
+        ),
+      ),
     );
   }
 }

@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/theme/theme.dart';
 import '../../../shared/widgets/page_header.dart';
 import '../../../shared/widgets/shared_pagination.dart';
+import '../../../shared/widgets/skeleton.dart';
 import 'provider_open_requests_notifier.dart';
 import 'widgets/provider_request_card.dart';
 
@@ -63,7 +64,7 @@ class ProviderRequestsScreen extends ConsumerWidget {
             ),
           Expanded(
             child: RefreshIndicator(
-              color: AppColors.primary600,
+              color: AppColors.blue600,
               onRefresh: () => notifier.fetchRequests(page: 1),
               child: _buildBody(state, notifier),
             ),
@@ -84,9 +85,7 @@ class ProviderRequestsScreen extends ConsumerWidget {
 
   Widget _buildBody(ProviderOpenRequestsState state, ProviderOpenRequestsNotifier notifier) {
     if (state.loading && state.requests.isEmpty) {
-      return const Center(
-        child: CircularProgressIndicator(color: AppColors.primary600, strokeWidth: 2),
-      );
+      return const _RequestListSkeleton();
     }
 
     if (state.error != null && state.requests.isEmpty) {
@@ -159,7 +158,7 @@ class ProviderRequestsScreen extends ConsumerWidget {
             left: 0,
             right: 0,
             child: LinearProgressIndicator(
-              color: AppColors.primary600,
+              color: AppColors.blue600,
               backgroundColor: AppColors.gray100,
               minHeight: 2,
             ),
@@ -338,6 +337,49 @@ class _CategoryFilterSheet extends StatelessWidget {
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+class _RequestListSkeleton extends StatelessWidget {
+  const _RequestListSkeleton();
+
+  @override
+  Widget build(BuildContext context) {
+    return ListView.builder(
+      padding: const EdgeInsets.all(16),
+      itemCount: 5,
+      itemBuilder: (context, index) => Container(
+        margin: const EdgeInsets.only(bottom: 12),
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: AppColors.gray200),
+        ),
+        child: const Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Expanded(child: SkeletonBox(height: 15, radius: 5)),
+                SizedBox(width: 40),
+                SkeletonBox(height: 22, width: 70, radius: 5),
+              ],
+            ),
+            SizedBox(height: 10),
+            SkeletonBox(height: 12, width: 180, radius: 4),
+            SizedBox(height: 8),
+            Row(
+              children: [
+                SkeletonBox(height: 22, width: 80, radius: 20),
+                SizedBox(width: 8),
+                SkeletonBox(height: 22, width: 70, radius: 20),
+              ],
+            ),
+          ],
+        ),
       ),
     );
   }
