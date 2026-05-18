@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import '../../../core/theme/theme.dart';
 import '../../../shared/widgets/shared_pagination.dart';
 import 'provider_notifications_notifier.dart';
@@ -196,9 +197,15 @@ class _ProviderNotificationsScreenState extends ConsumerState<ProviderNotificati
       padding: const EdgeInsets.all(16),
       itemCount: filtered.length,
       separatorBuilder: (context, index) => const SizedBox(height: 8),
-      itemBuilder: (_, i) => _NotificationCard(
+      itemBuilder: (context, i) => _NotificationCard(
         item: filtered[i],
-        onTap: () => notifier.markAsRead(filtered[i].id),
+        onTap: () {
+          notifier.markAsRead(filtered[i].id);
+          final link = filtered[i].link;
+          if (link != null && link.isNotEmpty) {
+            context.push(link);
+          }
+        },
       ),
     );
   }
