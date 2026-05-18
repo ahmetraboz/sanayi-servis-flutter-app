@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../../core/theme/theme.dart';
+import '../../../shared/widgets/date_picker_sheet.dart';
 import '../../../shared/widgets/page_header.dart';
 import '../../../shared/widgets/shared_pagination.dart';
 import '../../../shared/widgets/skeleton.dart';
@@ -287,6 +288,7 @@ class _BidCard extends StatelessWidget {
     final model = bid['vehicleModel'] as String? ?? '';
     final duration = bid['estimatedDuration'] as String?;
     final description = bid['description'] as String?;
+    final proposedDate = bid['proposedDate'] as String?;
     final createdAt = bid['createdAt'] as String?;
     final price = bid['price'];
     final requestId = bid['requestId'];
@@ -357,6 +359,28 @@ class _BidCard extends StatelessWidget {
                     style: const TextStyle(fontSize: 13, color: AppColors.gray600, height: 1.4),
                     maxLines: 2,
                     overflow: TextOverflow.ellipsis,
+                  ),
+                ],
+                if (proposedDate != null) ...[
+                  const SizedBox(height: 8),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFECFDF5),
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(color: const Color(0xFF6EE7B7)),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const Icon(Icons.event_available_outlined, size: 14, color: Color(0xFF059669)),
+                        const SizedBox(width: 6),
+                        Text(
+                          'Önerilen tarih: ${formatDateTr(proposedDate)}',
+                          style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w500, color: Color(0xFF065F46)),
+                        ),
+                      ],
+                    ),
                   ),
                 ],
                 const SizedBox(height: 10),

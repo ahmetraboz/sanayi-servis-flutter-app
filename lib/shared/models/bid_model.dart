@@ -14,6 +14,7 @@ class BidModel {
   final String? vehicleModel;
   final double? averageRating;
   final int? reviewCount;
+  final String? proposedDate;
   final DateTime createdAt;
   final DateTime? updatedAt;
 
@@ -33,6 +34,7 @@ class BidModel {
     this.vehicleModel,
     this.averageRating,
     this.reviewCount,
+    this.proposedDate,
     required this.createdAt,
     this.updatedAt,
   });
@@ -53,6 +55,7 @@ class BidModel {
     vehicleModel: json['vehicleModel'] as String?,
     averageRating: (json['averageRating'] as num?)?.toDouble(),
     reviewCount: json['reviewCount'] as int?,
+    proposedDate: json['proposedDate'] as String?,
     createdAt: DateTime.tryParse(json['createdAt'] as String? ?? '') ?? DateTime.now(),
     updatedAt: json['updatedAt'] != null
         ? DateTime.tryParse(json['updatedAt'] as String)
@@ -75,6 +78,7 @@ class BidModel {
     'vehicleModel': vehicleModel,
     'averageRating': averageRating,
     'reviewCount': reviewCount,
+    'proposedDate': proposedDate,
     'createdAt': createdAt.toIso8601String(),
     'updatedAt': updatedAt?.toIso8601String(),
   };

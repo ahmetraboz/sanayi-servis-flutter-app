@@ -24,6 +24,8 @@ class RequestModel {
   final String? aiDetectedPart;
   final double? aiConfidence;
   final dynamic damageReports;
+  final String? preferredDateFrom;
+  final String? preferredDateTo;
   final DateTime createdAt;
   final DateTime? updatedAt;
 
@@ -53,6 +55,8 @@ class RequestModel {
     this.aiDetectedPart,
     this.aiConfidence,
     this.damageReports,
+    this.preferredDateFrom,
+    this.preferredDateTo,
     required this.createdAt,
     this.updatedAt,
   });
@@ -83,6 +87,8 @@ class RequestModel {
     aiDetectedPart: json['aiDetectedPart'] as String?,
     aiConfidence: (json['aiConfidence'] as num?)?.toDouble(),
     damageReports: json['damageReports'],
+    preferredDateFrom: json['preferredDateFrom'] as String?,
+    preferredDateTo: json['preferredDateTo'] as String?,
     createdAt: DateTime.tryParse(json['createdAt'] as String? ?? '') ?? DateTime.now(),
     updatedAt: json['updatedAt'] != null
         ? DateTime.tryParse(json['updatedAt'] as String)
@@ -115,6 +121,8 @@ class RequestModel {
     'aiDetectedPart': aiDetectedPart,
     'aiConfidence': aiConfidence,
     'damageReports': damageReports,
+    'preferredDateFrom': preferredDateFrom,
+    'preferredDateTo': preferredDateTo,
     'createdAt': createdAt.toIso8601String(),
     'updatedAt': updatedAt?.toIso8601String(),
   };

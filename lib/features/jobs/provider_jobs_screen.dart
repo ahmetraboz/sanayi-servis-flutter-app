@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../../core/theme/theme.dart';
+import '../../../shared/widgets/date_picker_sheet.dart';
 import '../../../shared/widgets/page_header.dart';
 import '../../../shared/widgets/skeleton.dart';
 import 'provider_jobs_notifier.dart';
@@ -203,6 +204,8 @@ class _ActiveJobCard extends StatelessWidget {
     final customerPhone = job['customerPhone'] as String?;
     final updatedAt = job['updatedAt'] as String?;
     final urgency = job['urgencyLevel'] as String?;
+    final proposedDate = job['proposedDate'] as String?;
+    final estimatedDuration = job['estimatedDuration'] as String?;
     final isInProgress = status == 'in_progress';
 
     return GestureDetector(
@@ -279,6 +282,32 @@ class _ActiveJobCard extends StatelessWidget {
                 ],
               ),
             ),
+            if (proposedDate != null) ...[
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 9),
+                decoration: const BoxDecoration(
+                  color: Color(0xFFF0FDF4),
+                  border: Border(top: BorderSide(color: Color(0xFFBBF7D0))),
+                ),
+                child: Row(
+                  children: [
+                    const Icon(Icons.event_available_outlined, size: 14, color: Color(0xFF059669)),
+                    const SizedBox(width: 6),
+                    Text(
+                      'Servis: ${formatDateTr(proposedDate)}',
+                      style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Color(0xFF065F46)),
+                    ),
+                    if (estimatedDuration != null && estimatedDuration.isNotEmpty) ...[
+                      const SizedBox(width: 8),
+                      Text(
+                        '· $estimatedDuration',
+                        style: const TextStyle(fontSize: 12, color: Color(0xFF059669)),
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+            ],
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
               decoration: const BoxDecoration(

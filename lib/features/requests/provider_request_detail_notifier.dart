@@ -141,6 +141,7 @@ class ProviderRequestDetailNotifier extends StateNotifier<ProviderRequestDetailS
 
   Future<bool> submitBid({
     required num price,
+    required String proposedDate,
     String? description,
     String? estimatedDuration,
   }) async {
@@ -149,6 +150,7 @@ class ProviderRequestDetailNotifier extends StateNotifier<ProviderRequestDetailS
       await _api.post('/api/provider/bids', data: {
         'requestId': requestId,
         'price': price,
+        'proposedDate': proposedDate,
         if (description != null && description.isNotEmpty) 'description': description,
         if (estimatedDuration != null && estimatedDuration.isNotEmpty) 'estimatedDuration': estimatedDuration,
       });

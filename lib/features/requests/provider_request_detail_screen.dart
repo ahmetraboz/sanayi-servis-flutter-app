@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../../../core/theme/theme.dart';
+import '../../../shared/widgets/date_picker_sheet.dart';
 import 'provider_open_requests_notifier.dart';
 import 'provider_request_detail_notifier.dart';
 
@@ -139,6 +140,13 @@ class ProviderRequestDetailScreen extends ConsumerWidget {
       children: [
         _HeaderCard(request: req),
         const SizedBox(height: 12),
+        if (req['preferredDateFrom'] != null || req['preferredDateTo'] != null) ...[
+          _PreferredDateBanner(
+            dateFrom: req['preferredDateFrom'] as String?,
+            dateTo: req['preferredDateTo'] as String?,
+          ),
+          const SizedBox(height: 12),
+        ],
         if (state.isInfoRequested) ...[
           _StatusBanner(
             icon: Icons.access_time_rounded,
@@ -159,6 +167,15 @@ class ProviderRequestDetailScreen extends ConsumerWidget {
         if (req['aiDetectedPart'] != null) ...[
           const SizedBox(height: 12),
           _AiCard(request: req),
+        ],
+        if (state.acceptedBid != null &&
+            (state.acceptedBid!['proposedDate'] as String?) != null) ...[
+          const SizedBox(height: 12),
+          _ScheduledDateCard(
+            proposedDate: state.acceptedBid!['proposedDate'] as String,
+            estimatedDuration: state.acceptedBid!['estimatedDuration'] as String?,
+            price: state.acceptedBid!['price'],
+          ),
         ],
         if (state.updates.isNotEmpty || state.acceptedBid != null) ...[
           const SizedBox(height: 12),
@@ -1145,7 +1162,7 @@ class _ActionBar extends ConsumerWidget {
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
-      builder: (_) => _BidSheet(notifier: notifier),
+      builder: (_) => _BidSheet(notifier: notifier, request: state.request!),
     );
   }
 
@@ -1160,11 +1177,191 @@ class _ActionBar extends ConsumerWidget {
   }
 }
 
+// ─── Scheduled date card (accepted bid) ──────────────────────────────────────
+
+class _ScheduledDateCard extends StatelessWidget {
+  final String proposedDate;
+  final String? estimatedDuration;
+  final dynamic price;
+
+  const _ScheduledDateCard({
+    required this.proposedDate,
+    this.estimatedDuration,
+    this.price,
+  });
+
+  String _fmtPrice(dynamic raw) {
+    final val = double.tryParse('$raw') ?? 0;
+    return '${val.toStringAsFixed(0).replaceAllMapped(RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'), (m) => '${m[1]}.')} ₺';
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: const Color(0xFF6EE7B7), width: 1.5),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            decoration: const BoxDecoration(
+              color: Color(0xFFF0FDF4),
+              borderRadius: BorderRadius.vertical(top: Radius.circular(15)),
+            ),
+            child: Row(
+              children: [
+                const Icon(Icons.event_available_rounded, size: 16, color: Color(0xFF059669)),
+                const SizedBox(width: 8),
+                const Text(
+                  'Servis Tarihi',
+                  style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: Color(0xFF15803D)),
+                ),
+              ],
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.all(16),
+            child: Row(
+              children: [
+                Container(
+                  width: 48,
+                  height: 48,
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFDCFCE7),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: const Icon(Icons.calendar_month_rounded, size: 24, color: Color(0xFF059669)),
+                ),
+                const SizedBox(width: 14),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        formatDateTr(proposedDate),
+                        style: const TextStyle(
+                          fontSize: 17,
+                          fontWeight: FontWeight.w700,
+                          color: AppColors.gray900,
+                        ),
+                      ),
+                      if (estimatedDuration != null && estimatedDuration!.isNotEmpty) ...[
+                        const SizedBox(height: 2),
+                        Row(children: [
+                          const Icon(Icons.schedule_outlined, size: 13, color: AppColors.gray400),
+                          const SizedBox(width: 4),
+                          Text(
+                            estimatedDuration!,
+                            style: const TextStyle(fontSize: 13, color: AppColors.gray500),
+                          ),
+                        ]),
+                      ],
+                    ],
+                  ),
+                ),
+                if (price != null)
+                  Text(
+                    _fmtPrice(price),
+                    style: const TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.w800,
+                      color: Color(0xFF059669),
+                    ),
+                  ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ─── Preferred date banner ────────────────────────────────────────────────────
+
+class _PreferredDateBanner extends StatelessWidget {
+  final String? dateFrom;
+  final String? dateTo;
+  const _PreferredDateBanner({this.dateFrom, this.dateTo});
+
+  String _fmt(String? iso) {
+    if (iso == null || iso.isEmpty) return '';
+    final parts = iso.split('-');
+    if (parts.length < 3) return iso;
+    const months = [
+      'Ocak', 'Şubat', 'Mart', 'Nisan', 'Mayıs', 'Haziran',
+      'Temmuz', 'Ağustos', 'Eylül', 'Ekim', 'Kasım', 'Aralık',
+    ];
+    final day = int.tryParse(parts[2]) ?? 0;
+    final monthIdx = (int.tryParse(parts[1]) ?? 1) - 1;
+    if (monthIdx < 0 || monthIdx >= 12) return iso;
+    return '$day ${months[monthIdx]} ${parts[0]}';
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final String rangeText;
+    if (dateFrom != null && dateTo != null) {
+      rangeText = '${_fmt(dateFrom)} — ${_fmt(dateTo)}';
+    } else if (dateFrom != null) {
+      rangeText = '${_fmt(dateFrom)} tarihinden itibaren';
+    } else {
+      rangeText = '${_fmt(dateTo)} tarihine kadar';
+    }
+
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: const Color(0xFFFFFBEB),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: const Color(0xFFFCD34D)),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Icon(Icons.event_outlined, size: 18, color: Color(0xFFD97706)),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  'Müşteri Tercih Ettiği Tarih Aralığı',
+                  style: TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                    color: Color(0xFF92400E),
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  rangeText,
+                  style: const TextStyle(fontSize: 13, color: Color(0xFFB45309)),
+                ),
+                const SizedBox(height: 4),
+                const Text(
+                  'Bu aralığa uygun bir tarih önerin',
+                  style: TextStyle(fontSize: 11, color: Color(0xFFD97706)),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 // ─── Bid bottom sheet ─────────────────────────────────────────────────────────
 
 class _BidSheet extends StatefulWidget {
   final ProviderRequestDetailNotifier notifier;
-  const _BidSheet({required this.notifier});
+  final Map<String, dynamic> request;
+  const _BidSheet({required this.notifier, required this.request});
 
   @override
   State<_BidSheet> createState() => _BidSheetState();
@@ -1174,22 +1371,44 @@ class _BidSheetState extends State<_BidSheet> {
   final _priceController = TextEditingController();
   final _descController = TextEditingController();
   String _selectedDuration = '';
+  String? _proposedDate;
   bool _submitting = false;
 
   static const _durations = ['1 saat', '2-3 saat', 'Yarım gün', '1 gün', '2-3 gün', '1 hafta'];
 
   bool get _isValid {
     final price = int.tryParse(_priceController.text.replaceAll(RegExp(r'[^0-9]'), ''));
-    return price != null && price > 0;
+    return price != null && price > 0 && _proposedDate != null;
+  }
+
+  void _pickDate() {
+    final dateFrom = widget.request['preferredDateFrom'] as String?;
+    final dateTo = widget.request['preferredDateTo'] as String?;
+    showModalBottomSheet(
+      context: context,
+      useRootNavigator: true,
+      backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (_) => DatePickerSheet(
+        title: 'Servis Tarihi Öner',
+        initialDate: _proposedDate,
+        highlightFrom: dateFrom,
+        highlightTo: dateTo,
+        onSelected: (date) => setState(() => _proposedDate = date),
+      ),
+    );
   }
 
   Future<void> _submit() async {
     final price = int.tryParse(_priceController.text.replaceAll(RegExp(r'[^0-9]'), ''));
-    if (price == null || price <= 0) return;
+    if (price == null || price <= 0 || _proposedDate == null) return;
 
     setState(() => _submitting = true);
     final ok = await widget.notifier.submitBid(
       price: price,
+      proposedDate: _proposedDate!,
       description: _descController.text.trim().isEmpty ? null : _descController.text.trim(),
       estimatedDuration: _selectedDuration.isEmpty ? null : _selectedDuration,
     );
@@ -1219,8 +1438,12 @@ class _BidSheetState extends State<_BidSheet> {
   Widget build(BuildContext context) {
     final bottom = MediaQuery.of(context).viewInsets.bottom;
     final screenHeight = MediaQuery.of(context).size.height;
+    final dateFrom = widget.request['preferredDateFrom'] as String?;
+    final dateTo = widget.request['preferredDateTo'] as String?;
+    final hasPreferredRange = dateFrom != null || dateTo != null;
+
     return Container(
-      constraints: BoxConstraints(maxHeight: screenHeight * 0.9),
+      constraints: BoxConstraints(maxHeight: screenHeight * 0.92),
       decoration: const BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
@@ -1252,6 +1475,10 @@ class _BidSheetState extends State<_BidSheet> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
+                  if (hasPreferredRange) ...[
+                    _PreferredDateBanner(dateFrom: dateFrom, dateTo: dateTo),
+                    const SizedBox(height: 16),
+                  ],
                   const Text('Teklif Fiyatı *', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: AppColors.gray700)),
                   const SizedBox(height: 6),
                   TextField(
@@ -1264,13 +1491,66 @@ class _BidSheetState extends State<_BidSheet> {
                       suffixText: '₺',
                       suffixStyle: const TextStyle(fontSize: 20, fontWeight: FontWeight.w700, color: AppColors.gray400),
                       border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: AppColors.gray200)),
-                      focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: AppColors.primary600, width: 1.5)),
+                      focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: AppColors.blue600, width: 1.5)),
                       contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
                     ),
                     onChanged: (_) => setState(() {}),
                   ),
                   const SizedBox(height: 6),
                   const Text('KDV dahil toplam tutar', style: TextStyle(fontSize: 12, color: AppColors.gray400)),
+                  const SizedBox(height: 16),
+                  const Text('Servis Tarihi *', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: AppColors.gray700)),
+                  const SizedBox(height: 4),
+                  const Text(
+                    'Müşteriye hangi tarihte hizmet verebilirsiniz?',
+                    style: TextStyle(fontSize: 12, color: AppColors.gray500),
+                  ),
+                  const SizedBox(height: 8),
+                  GestureDetector(
+                    onTap: _pickDate,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 13),
+                      decoration: BoxDecoration(
+                        color: AppColors.gray50,
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(
+                          color: _proposedDate != null ? AppColors.blue600 : AppColors.gray200,
+                          width: _proposedDate != null ? 1.5 : 1,
+                        ),
+                      ),
+                      child: Row(
+                        children: [
+                          Icon(
+                            Icons.calendar_today_outlined,
+                            size: 18,
+                            color: _proposedDate != null ? AppColors.blue600 : AppColors.gray400,
+                          ),
+                          const SizedBox(width: 10),
+                          Expanded(
+                            child: Text(
+                              _proposedDate != null ? formatDateTr(_proposedDate) : 'Tarih seçin',
+                              style: TextStyle(
+                                fontSize: 14,
+                                fontWeight: _proposedDate != null ? FontWeight.w600 : FontWeight.normal,
+                                color: _proposedDate != null ? AppColors.gray900 : AppColors.gray400,
+                              ),
+                            ),
+                          ),
+                          if (_proposedDate != null)
+                            GestureDetector(
+                              onTap: () => setState(() => _proposedDate = null),
+                              behavior: HitTestBehavior.opaque,
+                              child: const Padding(
+                                padding: EdgeInsets.only(left: 6),
+                                child: Icon(Icons.close, size: 16, color: AppColors.gray400),
+                              ),
+                            )
+                          else
+                            const Icon(Icons.chevron_right, size: 18, color: AppColors.gray400),
+                        ],
+                      ),
+                    ),
+                  ),
                   const SizedBox(height: 16),
                   const Text('Tahmini Süre', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: AppColors.gray700)),
                   const SizedBox(height: 8),
@@ -1284,9 +1564,9 @@ class _BidSheetState extends State<_BidSheet> {
                         child: Container(
                           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
                           decoration: BoxDecoration(
-                            color: active ? AppColors.primary600 : Colors.white,
+                            color: active ? AppColors.blue600 : Colors.white,
                             borderRadius: BorderRadius.circular(8),
-                            border: Border.all(color: active ? AppColors.primary600 : AppColors.gray300),
+                            border: Border.all(color: active ? AppColors.blue600 : AppColors.gray300),
                           ),
                           child: Text(
                             d,
@@ -1310,7 +1590,7 @@ class _BidSheetState extends State<_BidSheet> {
                       hintText: 'Yapılacak işlemleri, kullanılacak parçaları ve garantiyi açıklayın...',
                       hintStyle: const TextStyle(fontSize: 13, color: AppColors.gray400),
                       border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: AppColors.gray200)),
-                      focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: AppColors.primary600, width: 1.5)),
+                      focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: AppColors.blue600, width: 1.5)),
                       contentPadding: const EdgeInsets.all(14),
                     ),
                   ),
@@ -1341,7 +1621,7 @@ class _BidSheetState extends State<_BidSheet> {
                   child: ElevatedButton(
                     onPressed: _submitting || !_isValid ? null : _submit,
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: AppColors.primary600,
+                      backgroundColor: AppColors.blue600,
                       foregroundColor: Colors.white,
                       disabledBackgroundColor: AppColors.gray200,
                       padding: const EdgeInsets.symmetric(vertical: 14),
