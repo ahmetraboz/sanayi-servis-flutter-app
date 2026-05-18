@@ -32,6 +32,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
   final _step3Key = GlobalKey<FormState>();
   final _taxCtrl = TextEditingController();
   final _descCtrl = TextEditingController();
+  final List<String> _selectedServiceAreas = [];
 
   bool _loading = false;
   String _errorMessage = '';
@@ -90,6 +91,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
               if (b.longitude != null) 'longitude': '${b.longitude}',
               if (b.googlePlaceId != null && b.googlePlaceId!.isNotEmpty) 'googlePlaceId': b.googlePlaceId,
               if (b.workingHours != null) 'workingHours': jsonEncode(b.workingHours),
+              if (_selectedServiceAreas.isNotEmpty) 'serviceAreas': jsonEncode(_selectedServiceAreas),
               if (_taxCtrl.text.trim().isNotEmpty) 'taxNumber': _taxCtrl.text.trim(),
               if (_descCtrl.text.trim().isNotEmpty) 'description': _descCtrl.text.trim(),
             },
@@ -283,6 +285,18 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                 keyboardType: TextInputType.number,
                 style: const TextStyle(color: AppColors.gray900, fontSize: 14),
                 decoration: _inputDecoration(hint: '10 haneli vergi numarası', prefixIcon: Icons.receipt_outlined),
+              ),
+            ),
+            const SizedBox(height: 16),
+            _labeledField(
+              label: 'Hizmet Alanları (opsiyonel)',
+              child: _ServiceAreaPicker(
+                selected: _selectedServiceAreas,
+                onToggle: (key) => setState(() {
+                  _selectedServiceAreas.contains(key)
+                      ? _selectedServiceAreas.remove(key)
+                      : _selectedServiceAreas.add(key);
+                }),
               ),
             ),
             const SizedBox(height: 16),
@@ -490,15 +504,86 @@ class _SummaryCard extends StatelessWidget {
           ...rows.map((r) => Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
                 child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(r.label, style: const TextStyle(fontSize: 13, color: AppColors.gray500)),
-                    Text(r.value, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w500, color: AppColors.gray900)),
+                    SizedBox(
+                      width: 90,
+                      child: Text(r.label, style: const TextStyle(fontSize: 13, color: AppColors.gray500)),
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        r.value,
+                        style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w500, color: AppColors.gray900),
+                        textAlign: TextAlign.right,
+                      ),
+                    ),
                   ],
                 ),
               )),
         ],
       ),
+    );
+  }
+}
+
+// ── Service Area Picker ────────────────────────────────────────────────────────
+
+const _kServiceAreas = [
+  (key: 'motor',    label: 'Motor',       icon: Icons.local_fire_department_outlined),
+  (key: 'elektrik', label: 'Elektrik',    icon: Icons.bolt_outlined),
+  (key: 'fren',     label: 'Frenler',     icon: Icons.do_not_disturb_on_outlined),
+  (key: 'suspan',   label: 'Süspansiyon', icon: Icons.tune_outlined),
+  (key: 'kaporta',  label: 'Kaporta',     icon: Icons.brush_outlined),
+  (key: 'klima',    label: 'Klima',       icon: Icons.ac_unit_outlined),
+  (key: 'lastik',   label: 'Lastik',      icon: Icons.tire_repair_outlined),
+  (key: 'vites',    label: 'Şanzıman',    icon: Icons.settings_outlined),
+  (key: 'egzoz',    label: 'Egzoz',       icon: Icons.cloud_outlined),
+  (key: 'diger',    label: 'Diğer',       icon: Icons.help_outline),
+];
+
+class _ServiceAreaPicker extends StatelessWidget {
+  final List<String> selected;
+  final void Function(String) onToggle;
+
+  const _ServiceAreaPicker({required this.selected, required this.onToggle});
+
+  @override
+  Widget build(BuildContext context) {
+    return Wrap(
+      spacing: 8,
+      runSpacing: 8,
+      children: _kServiceAreas.map((a) {
+        final isSelected = selected.contains(a.key);
+        return GestureDetector(
+          onTap: () => onToggle(a.key),
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+            decoration: BoxDecoration(
+              color: isSelected ? AppColors.primary600.withValues(alpha: 0.08) : Colors.white,
+              borderRadius: BorderRadius.circular(10),
+              border: Border.all(
+                color: isSelected ? AppColors.primary600 : AppColors.gray200,
+              ),
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(a.icon, size: 15, color: isSelected ? AppColors.primary600 : AppColors.gray400),
+                const SizedBox(width: 6),
+                Text(
+                  a.label,
+                  style: TextStyle(
+                    fontSize: 13,
+                    fontWeight: isSelected ? FontWeight.w600 : FontWeight.w400,
+                    color: isSelected ? AppColors.primary600 : AppColors.gray600,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      }).toList(),
     );
   }
 }
