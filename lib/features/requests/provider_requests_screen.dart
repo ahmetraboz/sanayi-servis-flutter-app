@@ -9,6 +9,13 @@ import 'widgets/provider_request_card.dart';
 
 typedef _CategoryFilter = ({String key, String label, IconData icon, Color color});
 
+const _urgencyFilters = <_CategoryFilter>[
+  (key: 'all',    label: 'Her Öncelik', icon: Icons.filter_list_rounded,          color: Color(0xFF6B7280)),
+  (key: 'urgent', label: 'Acil',        icon: Icons.warning_amber_rounded,        color: Color(0xFFDC2626)),
+  (key: 'normal', label: 'Normal',      icon: Icons.radio_button_checked_outlined, color: Color(0xFF2563EB)),
+  (key: 'low',    label: 'Acele Değil', icon: Icons.remove_circle_outline,        color: Color(0xFF059669)),
+];
+
 const _categoryFilters = <_CategoryFilter>[
   (key: 'all',      label: 'Tüm Kategoriler', icon: Icons.list_alt_outlined,              color: Color(0xFF6B7280)),
   (key: 'motor',    label: 'Motor',            icon: Icons.local_fire_department_outlined, color: Color(0xFFDC2626)),
@@ -58,9 +65,11 @@ class ProviderRequestsScreen extends ConsumerWidget {
                     )
                   : null,
             ),
-            _CategoryFilterPill(
+            _FilterBar(
               activeCategory: state.activeCategory,
-              onChanged: notifier.onCategoryChanged,
+              activeUrgency: state.activeUrgency,
+              onCategoryChanged: notifier.onCategoryChanged,
+              onUrgencyChanged: notifier.onUrgencyChanged,
             ),
           Expanded(
             child: RefreshIndicator(
@@ -168,85 +177,203 @@ class ProviderRequestsScreen extends ConsumerWidget {
   }
 }
 
-// ─── Filter Pill ──────────────────────────────────────────────────────────────
+// ─── Filter Bar (two pills) ───────────────────────────────────────────────────
 
-class _CategoryFilterPill extends StatelessWidget {
+class _FilterBar extends StatelessWidget {
   final String activeCategory;
+  final String activeUrgency;
+  final void Function(String) onCategoryChanged;
+  final void Function(String) onUrgencyChanged;
+
+  const _FilterBar({
+    required this.activeCategory,
+    required this.activeUrgency,
+    required this.onCategoryChanged,
+    required this.onUrgencyChanged,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.end,
+        children: [
+          _Pill(
+            label: 'Öncelik',
+            filters: _urgencyFilters,
+            activeKey: activeUrgency,
+            onChanged: onUrgencyChanged,
+          ),
+          const SizedBox(width: 8),
+          _Pill(
+            label: 'Kategori',
+            filters: _categoryFilters,
+            activeKey: activeCategory,
+            onChanged: onCategoryChanged,
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _Pill extends StatelessWidget {
+  final String label;
+  final List<_CategoryFilter> filters;
+  final String activeKey;
   final void Function(String) onChanged;
 
-  const _CategoryFilterPill({required this.activeCategory, required this.onChanged});
+  const _Pill({
+    required this.label,
+    required this.filters,
+    required this.activeKey,
+    required this.onChanged,
+  });
 
-  _CategoryFilter get _active => _categoryFilters.firstWhere(
-        (f) => f.key == activeCategory,
-        orElse: () => _categoryFilters.first,
+  bool get _isActive => activeKey != 'all';
+
+  _CategoryFilter get _active => filters.firstWhere(
+        (f) => f.key == activeKey,
+        orElse: () => filters.first,
       );
 
   void _showSheet(BuildContext context) {
     showModalBottomSheet(
+      useRootNavigator: true,
       context: context,
       backgroundColor: Colors.transparent,
       isScrollControlled: true,
-      builder: (_) => _CategoryFilterSheet(
-        activeCategory: activeCategory,
-        onChanged: (val) {
-          Navigator.of(context).pop();
-          onChanged(val);
-        },
+      builder: (_) => _PickerSheet(
+        title: label,
+        filters: filters,
+        activeKey: activeKey,
+        onChanged: onChanged,
+        onDone: () => Navigator.of(context).pop(),
       ),
     );
   }
 
   @override
   Widget build(BuildContext context) {
-    final active = _active;
-    final isFiltered = activeCategory != 'all';
+    final color = _isActive ? _active.color : AppColors.gray500;
 
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.end,
-        children: [
-          if (isFiltered) ...[
-            GestureDetector(
-              onTap: () => onChanged('all'),
-              child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 9),
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(10),
-                  border: Border.all(color: AppColors.gray200),
-                ),
-                child: const Icon(Icons.close_rounded, size: 16, color: AppColors.gray400),
+    return GestureDetector(
+      onTap: () => _showSheet(context),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+        decoration: BoxDecoration(
+          color: _isActive ? color.withValues(alpha: 0.08) : Colors.white,
+          borderRadius: BorderRadius.circular(10),
+          border: Border.all(
+            color: _isActive ? color.withValues(alpha: 0.4) : AppColors.gray200,
+          ),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            if (_isActive)
+              Icon(_active.icon, size: 14, color: color)
+            else
+              Icon(Icons.keyboard_arrow_down_rounded, size: 16, color: AppColors.gray400),
+            const SizedBox(width: 5),
+            Text(
+              _isActive ? _active.label : label,
+              style: TextStyle(
+                fontSize: 13,
+                fontWeight: _isActive ? FontWeight.w600 : FontWeight.w500,
+                color: _isActive ? color : AppColors.gray600,
               ),
             ),
-            const SizedBox(width: 8),
-          ],
-          GestureDetector(
-            onTap: () => _showSheet(context),
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 9),
-              decoration: BoxDecoration(
-                color: isFiltered ? active.color.withValues(alpha: 0.08) : Colors.white,
-                borderRadius: BorderRadius.circular(10),
-                border: Border.all(
-                  color: isFiltered ? active.color.withValues(alpha: 0.4) : AppColors.gray200,
-                ),
+            if (_isActive) ...[
+              const SizedBox(width: 5),
+              GestureDetector(
+                onTap: () => onChanged('all'),
+                child: Icon(Icons.close_rounded, size: 14, color: color),
               ),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
+            ] else ...[
+              const SizedBox(width: 2),
+              const Icon(Icons.keyboard_arrow_down_rounded, size: 15, color: AppColors.gray400),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// ─── Picker Sheet ─────────────────────────────────────────────────────────────
+
+class _PickerSheet extends StatefulWidget {
+  final String title;
+  final List<_CategoryFilter> filters;
+  final String activeKey;
+  final void Function(String) onChanged;
+  final VoidCallback onDone;
+
+  const _PickerSheet({
+    required this.title,
+    required this.filters,
+    required this.activeKey,
+    required this.onChanged,
+    required this.onDone,
+  });
+
+  @override
+  State<_PickerSheet> createState() => _PickerSheetState();
+}
+
+class _PickerSheetState extends State<_PickerSheet> {
+  late String _selected;
+
+  @override
+  void initState() {
+    super.initState();
+    _selected = widget.activeKey;
+  }
+
+  void _pick(String key) {
+    setState(() => _selected = key);
+    widget.onChanged(key);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final bottomPad = MediaQuery.of(context).padding.bottom;
+    return Container(
+      decoration: const BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      constraints: BoxConstraints(maxHeight: MediaQuery.of(context).size.height * 0.85),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const SizedBox(height: 12),
+          Container(width: 36, height: 4, decoration: BoxDecoration(color: AppColors.gray200, borderRadius: BorderRadius.circular(99))),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(20, 16, 20, 4),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text(widget.title, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: AppColors.gray900)),
+                GestureDetector(
+                  onTap: widget.onDone,
+                  child: const Text('Tamam', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: AppColors.blue600)),
+                ),
+              ],
+            ),
+          ),
+          Flexible(
+            child: SingleChildScrollView(
+              child: Column(
                 children: [
-                  Icon(Icons.tune_rounded, size: 16, color: isFiltered ? active.color : AppColors.gray500),
-                  const SizedBox(width: 6),
-                  Text(
-                    isFiltered ? active.label : 'Kategori',
-                    style: TextStyle(
-                      fontSize: 13,
-                      fontWeight: FontWeight.w500,
-                      color: isFiltered ? active.color : AppColors.gray600,
-                    ),
-                  ),
-                  const SizedBox(width: 4),
-                  Icon(Icons.keyboard_arrow_down_rounded, size: 16, color: isFiltered ? active.color : AppColors.gray400),
+                  ...widget.filters.map((f) => _FilterRow(
+                    filter: f,
+                    isActive: _selected == f.key,
+                    onTap: () => _pick(f.key),
+                  )),
+                  SizedBox(height: bottomPad + 16),
                 ],
               ),
             ),
@@ -257,86 +384,44 @@ class _CategoryFilterPill extends StatelessWidget {
   }
 }
 
-class _CategoryFilterSheet extends StatelessWidget {
-  final String activeCategory;
-  final void Function(String) onChanged;
+class _FilterRow extends StatelessWidget {
+  final _CategoryFilter filter;
+  final bool isActive;
+  final VoidCallback onTap;
 
-  const _CategoryFilterSheet({required this.activeCategory, required this.onChanged});
+  const _FilterRow({required this.filter, required this.isActive, required this.onTap});
 
   @override
   Widget build(BuildContext context) {
-    final bottomPad = MediaQuery.of(context).padding.bottom;
-    return Container(
-      decoration: const BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-      ),
-      constraints: BoxConstraints(maxHeight: MediaQuery.of(context).size.height * 0.75),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          const SizedBox(height: 12),
-          Container(
-            width: 36,
-            height: 4,
-            decoration: BoxDecoration(color: AppColors.gray200, borderRadius: BorderRadius.circular(99)),
-          ),
-          const SizedBox(height: 20),
-          const Padding(
-            padding: EdgeInsets.symmetric(horizontal: 20),
-            child: Align(
-              alignment: Alignment.centerLeft,
+    return InkWell(
+      onTap: onTap,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+        child: Row(
+          children: [
+            Container(
+              width: 36,
+              height: 36,
+              decoration: BoxDecoration(
+                color: filter.color.withValues(alpha: 0.1),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: Icon(filter.icon, size: 18, color: filter.color),
+            ),
+            const SizedBox(width: 14),
+            Expanded(
               child: Text(
-                'Kategori Filtrele',
-                style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: AppColors.gray900),
+                filter.label,
+                style: TextStyle(
+                  fontSize: 15,
+                  fontWeight: isActive ? FontWeight.w600 : FontWeight.w400,
+                  color: isActive ? filter.color : AppColors.gray700,
+                ),
               ),
             ),
-          ),
-          const SizedBox(height: 12),
-          Flexible(
-            child: SingleChildScrollView(
-              child: Column(
-                children: [
-                  ..._categoryFilters.map((f) {
-                    final isActive = activeCategory == f.key;
-                    return InkWell(
-                      onTap: () => onChanged(f.key),
-                      child: Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
-                        child: Row(
-                          children: [
-                            Container(
-                              width: 36,
-                              height: 36,
-                              decoration: BoxDecoration(
-                                color: f.color.withValues(alpha: 0.1),
-                                borderRadius: BorderRadius.circular(10),
-                              ),
-                              child: Icon(f.icon, size: 18, color: f.color),
-                            ),
-                            const SizedBox(width: 14),
-                            Expanded(
-                              child: Text(
-                                f.label,
-                                style: TextStyle(
-                                  fontSize: 15,
-                                  fontWeight: isActive ? FontWeight.w600 : FontWeight.w400,
-                                  color: isActive ? f.color : AppColors.gray700,
-                                ),
-                              ),
-                            ),
-                            if (isActive) Icon(Icons.check_rounded, size: 18, color: f.color),
-                          ],
-                        ),
-                      ),
-                    );
-                  }),
-                  SizedBox(height: bottomPad + 16),
-                ],
-              ),
-            ),
-          ),
-        ],
+            if (isActive) Icon(Icons.check_rounded, size: 18, color: filter.color),
+          ],
+        ),
       ),
     );
   }

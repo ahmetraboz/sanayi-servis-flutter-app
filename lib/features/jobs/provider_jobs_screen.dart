@@ -77,12 +77,14 @@ class ProviderJobsScreen extends ConsumerWidget {
             const SizedBox(height: 20),
             ElevatedButton.icon(
               onPressed: () => context.go('/provider/requests'),
-              icon: const Icon(Icons.description_outlined, size: 18),
-              label: const Text('Açık Taleplere Git'),
+              icon: const Icon(Icons.description_outlined, size: 16),
+              label: const Text('Açık Taleplere Git', style: TextStyle(fontSize: 14)),
               style: ElevatedButton.styleFrom(
                 backgroundColor: AppColors.blue600,
                 foregroundColor: Colors.white,
-                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+                minimumSize: Size.zero,
+                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
               ),
             ),

@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -88,6 +89,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
               if (b.latitude != null) 'latitude': '${b.latitude}',
               if (b.longitude != null) 'longitude': '${b.longitude}',
               if (b.googlePlaceId != null && b.googlePlaceId!.isNotEmpty) 'googlePlaceId': b.googlePlaceId,
+              if (b.workingHours != null) 'workingHours': jsonEncode(b.workingHours),
               if (_taxCtrl.text.trim().isNotEmpty) 'taxNumber': _taxCtrl.text.trim(),
               if (_descCtrl.text.trim().isNotEmpty) 'description': _descCtrl.text.trim(),
             },

@@ -98,14 +98,18 @@ class ProviderBidsScreen extends ConsumerWidget {
             ),
             if (state.activeTab == 'all') ...[
               const SizedBox(height: 12),
-              ElevatedButton(
+              ElevatedButton.icon(
                 onPressed: () => context.go('/provider/requests'),
+                icon: const Icon(Icons.description_outlined, size: 16),
+                label: const Text('Taleplere Git', style: TextStyle(fontSize: 14)),
                 style: ElevatedButton.styleFrom(
                   backgroundColor: AppColors.blue600,
                   foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+                  minimumSize: Size.zero,
+                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                 ),
-                child: const Text('Taleplere Git'),
               ),
             ],
           ],

@@ -213,6 +213,7 @@ class _ReviewCard extends StatelessWidget {
 
   void _openReplySheet(BuildContext context) {
     showModalBottomSheet(
+      useRootNavigator: true,
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,

@@ -1141,6 +1141,7 @@ class _ActionBar extends ConsumerWidget {
 
   Future<void> _showBidSheet(BuildContext context) async {
     await showModalBottomSheet(
+      useRootNavigator: true,
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
@@ -1150,6 +1151,7 @@ class _ActionBar extends ConsumerWidget {
 
   Future<void> _showInfoSheet(BuildContext context) async {
     await showModalBottomSheet(
+      useRootNavigator: true,
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,

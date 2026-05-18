@@ -15,6 +15,7 @@ class BusinessFinderResult {
   final double? latitude;
   final double? longitude;
   final String? googlePlaceId;
+  final Map<String, dynamic>? workingHours;
 
   const BusinessFinderResult({
     required this.companyName,
@@ -25,6 +26,7 @@ class BusinessFinderResult {
     this.latitude,
     this.longitude,
     this.googlePlaceId,
+    this.workingHours,
   });
 
   bool get isValid =>
@@ -39,6 +41,7 @@ class BusinessFinderResult {
     double? latitude,
     double? longitude,
     String? googlePlaceId,
+    Map<String, dynamic>? workingHours,
   }) {
     return BusinessFinderResult(
       companyName: companyName ?? this.companyName,
@@ -49,6 +52,7 @@ class BusinessFinderResult {
       latitude: latitude ?? this.latitude,
       longitude: longitude ?? this.longitude,
       googlePlaceId: googlePlaceId ?? this.googlePlaceId,
+      workingHours: workingHours ?? this.workingHours,
     );
   }
 }
@@ -188,6 +192,7 @@ class _BusinessFinderStepState extends ConsumerState<BusinessFinderStep>
         latitude: (d['latitude'] as num?)?.toDouble(),
         longitude: (d['longitude'] as num?)?.toDouble(),
         googlePlaceId: d['placeId'] as String? ?? s.placeId,
+        workingHours: d['workingHours'] as Map<String, dynamic>?,
       );
       if (!mounted) return;
       setState(() => _googleResult = result);

@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:cached_network_image/cached_network_image.dart';
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -25,6 +26,7 @@ class ProviderProfileScreen extends ConsumerStatefulWidget {
 class _ProviderProfileScreenState extends ConsumerState<ProviderProfileScreen> {
   void _openEditSheet(BuildContext context, Map<String, dynamic> profile) {
     showModalBottomSheet(
+      useRootNavigator: true,
       context: context,
       isScrollControlled: true,
       useSafeArea: true,
@@ -135,6 +137,8 @@ class _ProviderProfileScreenState extends ConsumerState<ProviderProfileScreen> {
             _PhotosCard(photos: state.photos),
             const SizedBox(height: 12),
             _InfoView(profile: profile),
+            const SizedBox(height: 12),
+            _WorkingHoursCard(profile: profile),
             const SizedBox(height: 24),
           ],
         ),
@@ -784,6 +788,106 @@ class _InfoView extends StatelessWidget {
   }
 }
 
+// ─── Working Hours Card ───────────────────────────────────────────────────────
+
+class _WorkingHoursCard extends StatelessWidget {
+  final Map<String, dynamic> profile;
+
+  static const _days = [
+    ('monday',    'Pazartesi'),
+    ('tuesday',   'Salı'),
+    ('wednesday', 'Çarşamba'),
+    ('thursday',  'Perşembe'),
+    ('friday',    'Cuma'),
+    ('saturday',  'Cumartesi'),
+    ('sunday',    'Pazar'),
+  ];
+
+  const _WorkingHoursCard({required this.profile});
+
+  Map<String, dynamic>? _parse() {
+    final raw = profile['workingHours'] as String?;
+    if (raw == null || raw.isEmpty) return null;
+    try {
+      return jsonDecode(raw) as Map<String, dynamic>;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final hours = _parse();
+    if (hours == null) return const SizedBox.shrink();
+
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: AppColors.gray200),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Padding(
+            padding: EdgeInsets.fromLTRB(16, 14, 16, 0),
+            child: Row(
+              children: [
+                Icon(Icons.schedule_outlined, size: 16, color: AppColors.blue600),
+                SizedBox(width: 8),
+                Text('Çalışma Saatleri', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 14, color: AppColors.gray900)),
+              ],
+            ),
+          ),
+          const Divider(height: 20, indent: 16, endIndent: 16),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+            child: Column(
+              children: _days.map((d) {
+                final (key, label) = d;
+                final day = hours[key] as Map<String, dynamic>?;
+                final isOpen = day?['isOpen'] as bool? ?? false;
+                final open  = day?['open']  as String? ?? '09:00';
+                final close = day?['close'] as String? ?? '18:00';
+                return Padding(
+                  padding: const EdgeInsets.only(bottom: 10),
+                  child: Row(
+                    children: [
+                      SizedBox(
+                        width: 90,
+                        child: Text(label, style: const TextStyle(fontSize: 13, color: AppColors.gray600, fontWeight: FontWeight.w500)),
+                      ),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                        decoration: BoxDecoration(
+                          color: isOpen ? AppColors.green50 : AppColors.gray100,
+                          borderRadius: BorderRadius.circular(6),
+                        ),
+                        child: Text(
+                          isOpen ? 'Açık' : 'Kapalı',
+                          style: TextStyle(
+                            fontSize: 11,
+                            fontWeight: FontWeight.w600,
+                            color: isOpen ? AppColors.primary600 : AppColors.gray400,
+                          ),
+                        ),
+                      ),
+                      if (isOpen) ...[
+                        const SizedBox(width: 10),
+                        Text('$open – $close', style: const TextStyle(fontSize: 13, color: AppColors.gray700)),
+                      ],
+                    ],
+                  ),
+                );
+              }).toList(),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 // ─── Profile Edit Sheet ───────────────────────────────────────────────────────
 
 class _ProfileEditSheet extends ConsumerStatefulWidget {
@@ -802,6 +906,7 @@ class _ProfileEditSheetState extends ConsumerState<_ProfileEditSheet> {
   late final TextEditingController _cityCtrl;
   late final TextEditingController _districtCtrl;
   late final TextEditingController _descriptionCtrl;
+  late Map<String, Map<String, dynamic>> _workingHours;
 
   @override
   void initState() {
@@ -813,6 +918,19 @@ class _ProfileEditSheetState extends ConsumerState<_ProfileEditSheet> {
     _cityCtrl        = TextEditingController(text: p['city']        as String? ?? '');
     _districtCtrl    = TextEditingController(text: p['district']    as String? ?? '');
     _descriptionCtrl = TextEditingController(text: p['description'] as String? ?? '');
+    final raw = p['workingHours'] as String?;
+    Map<String, dynamic> parsed = {};
+    if (raw != null && raw.isNotEmpty) {
+      try { parsed = jsonDecode(raw) as Map<String, dynamic>; } catch (_) {}
+    }
+    _workingHours = {
+      for (final key in ['monday','tuesday','wednesday','thursday','friday','saturday','sunday'])
+        key: (parsed[key] as Map<String, dynamic>?) ?? {
+          'isOpen': ['monday','tuesday','wednesday','thursday','friday'].contains(key),
+          'open': '09:00',
+          'close': '18:00',
+        }
+    };
   }
 
   @override
@@ -826,14 +944,74 @@ class _ProfileEditSheetState extends ConsumerState<_ProfileEditSheet> {
     super.dispose();
   }
 
+  void _pickTime(String dayKey, String field, String current) {
+    final parts = current.split(':');
+    var selected = DateTime(0, 0, 0, int.parse(parts[0]), int.parse(parts[1]));
+    showModalBottomSheet(
+      useRootNavigator: true,
+      context: context,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) => Container(
+        decoration: const BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const SizedBox(height: 8),
+            Container(width: 36, height: 4, decoration: BoxDecoration(color: AppColors.gray200, borderRadius: BorderRadius.circular(99))),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                CupertinoButton(
+                  child: const Text('İptal', style: TextStyle(color: AppColors.gray500)),
+                  onPressed: () => Navigator.of(ctx).pop(),
+                ),
+                CupertinoButton(
+                  child: const Text('Tamam', style: TextStyle(color: AppColors.blue600, fontWeight: FontWeight.w600)),
+                  onPressed: () {
+                    Navigator.of(ctx).pop();
+                    final h = selected.hour.toString().padLeft(2, '0');
+                    final m = selected.minute.toString().padLeft(2, '0');
+                    setState(() => _workingHours[dayKey] = {
+                      ..._workingHours[dayKey]!,
+                      field: '$h:$m',
+                    });
+                  },
+                ),
+              ],
+            ),
+            SizedBox(
+              height: 200,
+              child: CupertinoDatePicker(
+                mode: CupertinoDatePickerMode.time,
+                use24hFormat: true,
+                initialDateTime: selected,
+                minuteInterval: 15,
+                onDateTimeChanged: (dt) => selected = dt,
+              ),
+            ),
+            SizedBox(height: MediaQuery.of(ctx).padding.bottom + 12),
+          ],
+        ),
+      ),
+    );
+  }
+
   Future<void> _save() async {
     final ok = await ref.read(providerProfileProvider.notifier).saveProfile({
-      'companyName': _companyNameCtrl.text.trim(),
-      'taxNumber':   _taxNumberCtrl.text.trim(),
-      'address':     _addressCtrl.text.trim(),
-      'city':        _cityCtrl.text.trim(),
-      'district':    _districtCtrl.text.trim(),
-      'description': _descriptionCtrl.text.trim(),
+      'companyName':  _companyNameCtrl.text.trim(),
+      'taxNumber':    _taxNumberCtrl.text.trim(),
+      'address':      _addressCtrl.text.trim(),
+      'city':         _cityCtrl.text.trim(),
+      'district':     _districtCtrl.text.trim(),
+      'description':  _descriptionCtrl.text.trim(),
+      'workingHours': jsonEncode(_workingHours),
+      if (widget.profile['serviceAreas'] != null) 'serviceAreas': widget.profile['serviceAreas'] as String,
+      if (widget.profile['googlePlaceId'] != null) 'googlePlaceId': widget.profile['googlePlaceId'] as String,
+      if (widget.profile['latitude'] != null) 'latitude': widget.profile['latitude'] as String,
+      if (widget.profile['longitude'] != null) 'longitude': widget.profile['longitude'] as String,
     });
     if (ok && mounted) {
       Navigator.of(context).pop();
@@ -1119,6 +1297,93 @@ class _ProfileEditSheetState extends ConsumerState<_ProfileEditSheet> {
                   ),
                   const SizedBox(height: 12),
                   _Field(label: 'İşletme Açıklaması', ctrl: _descriptionCtrl, icon: Icons.description_outlined, maxLines: 4),
+                  const SizedBox(height: 20),
+                  const Divider(),
+                  const SizedBox(height: 16),
+                  // ── Çalışma Saatleri ─────────────────────────────────
+                  const Row(
+                    children: [
+                      Icon(Icons.schedule_outlined, size: 14, color: AppColors.gray500),
+                      SizedBox(width: 6),
+                      Text('Çalışma Saatleri', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: AppColors.gray700)),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+                  ...[
+                    ('monday',    'Pazartesi'),
+                    ('tuesday',   'Salı'),
+                    ('wednesday', 'Çarşamba'),
+                    ('thursday',  'Perşembe'),
+                    ('friday',    'Cuma'),
+                    ('saturday',  'Cumartesi'),
+                    ('sunday',    'Pazar'),
+                  ].map((d) {
+                    final (key, label) = d;
+                    final day = _workingHours[key]!;
+                    final isOpen = day['isOpen'] as bool;
+                    final openTime  = day['open']  as String;
+                    final closeTime = day['close'] as String;
+                    return Padding(
+                      padding: const EdgeInsets.only(bottom: 10),
+                      child: Row(
+                        children: [
+                          SizedBox(
+                            width: 88,
+                            child: Text(label, style: const TextStyle(fontSize: 13, color: AppColors.gray700, fontWeight: FontWeight.w500)),
+                          ),
+                          GestureDetector(
+                            onTap: () => setState(() => _workingHours[key] = {...day, 'isOpen': !isOpen}),
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                              decoration: BoxDecoration(
+                                color: isOpen ? AppColors.primary600 : AppColors.gray200,
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                              child: Text(
+                                isOpen ? 'Açık' : 'Kapalı',
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w600,
+                                  color: isOpen ? Colors.white : AppColors.gray500,
+                                ),
+                              ),
+                            ),
+                          ),
+                          if (isOpen) ...[
+                            const Spacer(),
+                            GestureDetector(
+                              onTap: () => _pickTime(key, 'open', openTime),
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                                decoration: BoxDecoration(
+                                  color: AppColors.gray50,
+                                  border: Border.all(color: AppColors.gray200),
+                                  borderRadius: BorderRadius.circular(8),
+                                ),
+                                child: Text(openTime, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w500, color: AppColors.gray700)),
+                              ),
+                            ),
+                            const Padding(
+                              padding: EdgeInsets.symmetric(horizontal: 6),
+                              child: Text('–', style: TextStyle(color: AppColors.gray400)),
+                            ),
+                            GestureDetector(
+                              onTap: () => _pickTime(key, 'close', closeTime),
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                                decoration: BoxDecoration(
+                                  color: AppColors.gray50,
+                                  border: Border.all(color: AppColors.gray200),
+                                  borderRadius: BorderRadius.circular(8),
+                                ),
+                                child: Text(closeTime, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w500, color: AppColors.gray700)),
+                              ),
+                            ),
+                          ],
+                        ],
+                      ),
+                    );
+                  }),
                   const SizedBox(height: 8),
                 ],
               ),

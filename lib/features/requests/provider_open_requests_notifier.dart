@@ -12,6 +12,7 @@ class ProviderOpenRequestsState {
   final int totalPages;
   final int total;
   final String activeCategory;
+  final String activeUrgency;
 
   ProviderOpenRequestsState({
     this.loading = true,
@@ -22,6 +23,7 @@ class ProviderOpenRequestsState {
     this.totalPages = 1,
     this.total = 0,
     this.activeCategory = 'all',
+    this.activeUrgency = 'all',
   }) : _allRequests = allRequests;
 
   ProviderOpenRequestsState copyWith({
@@ -33,6 +35,7 @@ class ProviderOpenRequestsState {
     int? totalPages,
     int? total,
     String? activeCategory,
+    String? activeUrgency,
   }) {
     return ProviderOpenRequestsState(
       loading: loading ?? this.loading,
@@ -43,8 +46,11 @@ class ProviderOpenRequestsState {
       totalPages: totalPages ?? this.totalPages,
       total: total ?? this.total,
       activeCategory: activeCategory ?? this.activeCategory,
+      activeUrgency: activeUrgency ?? this.activeUrgency,
     );
   }
+
+  bool get hasActiveFilter => activeCategory != 'all' || activeUrgency != 'all';
 }
 
 class ProviderOpenRequestsNotifier extends StateNotifier<ProviderOpenRequestsState> {
@@ -63,7 +69,7 @@ class ProviderOpenRequestsNotifier extends StateNotifier<ProviderOpenRequestsSta
       );
 
       final all = response.data['data'] as List<dynamic>? ?? [];
-      _applyFilter(all: all, category: state.activeCategory, page: page);
+      _applyFilter(all: all, category: state.activeCategory, urgency: state.activeUrgency, page: page);
     } catch (e) {
       state = state.copyWith(
         loading: false,
@@ -74,25 +80,45 @@ class ProviderOpenRequestsNotifier extends StateNotifier<ProviderOpenRequestsSta
 
   void onCategoryChanged(String category) {
     if (state.activeCategory == category) return;
-    _applyFilter(all: state._allRequests, category: category, page: 1);
+    _applyFilter(all: state._allRequests, category: category, urgency: state.activeUrgency, page: 1);
+  }
+
+  void onUrgencyChanged(String urgency) {
+    if (state.activeUrgency == urgency) return;
+    _applyFilter(all: state._allRequests, category: state.activeCategory, urgency: urgency, page: 1);
+  }
+
+  void clearFilters() {
+    _applyFilter(all: state._allRequests, category: 'all', urgency: 'all', page: 1);
   }
 
   void nextPage() {
     if (state.currentPage < state.totalPages) {
-      _applyFilter(all: state._allRequests, category: state.activeCategory, page: state.currentPage + 1);
+      _applyFilter(all: state._allRequests, category: state.activeCategory, urgency: state.activeUrgency, page: state.currentPage + 1);
     }
   }
 
   void previousPage() {
     if (state.currentPage > 1) {
-      _applyFilter(all: state._allRequests, category: state.activeCategory, page: state.currentPage - 1);
+      _applyFilter(all: state._allRequests, category: state.activeCategory, urgency: state.activeUrgency, page: state.currentPage - 1);
     }
   }
 
-  void _applyFilter({required List<dynamic> all, required String category, required int page}) {
-    final filtered = category == 'all'
-        ? all
-        : all.where((r) => (r as Map<String, dynamic>)['problemCategory'] == category).toList();
+  void _applyFilter({
+    required List<dynamic> all,
+    required String category,
+    required String urgency,
+    required int page,
+  }) {
+    var filtered = all;
+
+    if (category != 'all') {
+      filtered = filtered.where((r) => (r as Map<String, dynamic>)['problemCategory'] == category).toList();
+    }
+
+    if (urgency != 'all') {
+      filtered = filtered.where((r) => (r as Map<String, dynamic>)['urgencyLevel'] == urgency).toList();
+    }
 
     final total = filtered.length;
     final totalPages = (total / _kPageSize).ceil().clamp(1, 999);
@@ -109,6 +135,7 @@ class ProviderOpenRequestsNotifier extends StateNotifier<ProviderOpenRequestsSta
       totalPages: totalPages,
       total: total,
       activeCategory: category,
+      activeUrgency: urgency,
     );
   }
 }
