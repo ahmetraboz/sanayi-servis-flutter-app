@@ -52,24 +52,7 @@ class ProviderBidsNotifier extends StateNotifier<ProviderBidsState> {
   final ApiClient _api;
 
   ProviderBidsNotifier(this._api) : super(const ProviderBidsState()) {
-    _init();
-  }
-
-  Future<void> _init() async {
-    await Future.wait([fetchBids(), _fetchCounts()]);
-  }
-
-  Future<void> _fetchCounts() async {
-    try {
-      final res = await _api.get('/api/provider/bids', queryParameters: {'limit': '200'});
-      final all = (res.data['data'] as List? ?? []).map((e) => e as Map<String, dynamic>).toList();
-      state = state.copyWith(counts: {
-        'all': all.length,
-        'pending': all.where((b) => b['status'] == 'pending').length,
-        'accepted': all.where((b) => b['status'] == 'accepted').length,
-        'rejected': all.where((b) => b['status'] == 'rejected').length,
-      });
-    } catch (_) {}
+    fetchBids();
   }
 
   Future<void> fetchBids({int page = 1}) async {
@@ -81,6 +64,13 @@ class ProviderBidsNotifier extends StateNotifier<ProviderBidsState> {
       final res = await _api.get('/api/provider/bids', queryParameters: params);
       final data = (res.data['data'] as List? ?? []).map((e) => e as Map<String, dynamic>).toList();
       final pagination = res.data['pagination'] as Map<String, dynamic>? ?? {};
+      final rawCounts = res.data['counts'] as Map<String, dynamic>? ?? const {};
+      final counts = <String, int>{
+        'all': (rawCounts['all'] as int?) ?? 0,
+        'pending': (rawCounts['pending'] as int?) ?? 0,
+        'accepted': (rawCounts['accepted'] as int?) ?? 0,
+        'rejected': (rawCounts['rejected'] as int?) ?? 0,
+      };
 
       state = state.copyWith(
         loading: false,
@@ -88,6 +78,7 @@ class ProviderBidsNotifier extends StateNotifier<ProviderBidsState> {
         currentPage: pagination['page'] as int? ?? 1,
         totalPages: pagination['totalPages'] as int? ?? 1,
         total: pagination['total'] as int? ?? data.length,
+        counts: counts,
       );
     } on DioException catch (e) {
       state = state.copyWith(loading: false, error: e.message ?? 'Teklifler yüklenemedi');

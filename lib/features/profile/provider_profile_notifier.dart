@@ -15,6 +15,7 @@ class ProviderProfileState {
   final String? saveError;
   final bool saveSuccess;
   final bool uploadingPhoto;
+  final bool uploadingLogo;
 
   const ProviderProfileState({
     this.loading = true,
@@ -24,6 +25,7 @@ class ProviderProfileState {
     this.saveError,
     this.saveSuccess = false,
     this.uploadingPhoto = false,
+    this.uploadingLogo = false,
   });
 
   ProviderProfileState copyWith({
@@ -34,6 +36,7 @@ class ProviderProfileState {
     Object? saveError = _sentinel,
     bool? saveSuccess,
     bool? uploadingPhoto,
+    bool? uploadingLogo,
   }) {
     return ProviderProfileState(
       loading: loading ?? this.loading,
@@ -43,6 +46,7 @@ class ProviderProfileState {
       saveError: identical(saveError, _sentinel) ? this.saveError : saveError as String?,
       saveSuccess: saveSuccess ?? this.saveSuccess,
       uploadingPhoto: uploadingPhoto ?? this.uploadingPhoto,
+      uploadingLogo: uploadingLogo ?? this.uploadingLogo,
     );
   }
 
@@ -107,6 +111,32 @@ class ProviderProfileNotifier extends StateNotifier<ProviderProfileState> {
     } on DioException catch (_) {
       state = state.copyWith(uploadingPhoto: false);
       return null;
+    }
+  }
+
+  /// Returns null on success, error message on failure.
+  Future<String?> uploadLogo(File file) async {
+    state = state.copyWith(uploadingLogo: true);
+    try {
+      final formData = FormData.fromMap({
+        'logo': await MultipartFile.fromFile(file.path, filename: file.path.split('/').last),
+      });
+      await _api.postFormData('/api/service-profile/logo', formData);
+      await loadProfile();
+      state = state.copyWith(uploadingLogo: false);
+      return null;
+    } on DioException catch (e) {
+      state = state.copyWith(uploadingLogo: false);
+      final status = e.response?.statusCode;
+      final data = e.response?.data;
+      if (status == 429 && data is Map<String, dynamic>) {
+        final daysLeft = data['data']?['daysLeft'] ?? data['daysLeft'];
+        if (daysLeft != null) {
+          return 'Logo $daysLeft gün sonra güncellenebilir';
+        }
+      }
+      final msg = data is Map<String, dynamic> ? data['statusMessage'] as String? : null;
+      return msg ?? 'Logo yüklenemedi';
     }
   }
 

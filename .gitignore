@@ -1,3 +1,8 @@
+# Secrets (her geliştirici kendi makinasında oluşturur, ekipten alır)
+.env
+ios/Flutter/Maps.xcconfig
+android/local.properties
+
 # Miscellaneous
 *.class
 *.log

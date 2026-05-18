@@ -855,6 +855,36 @@ class _ProfileEditSheetState extends ConsumerState<_ProfileEditSheet> {
     await ref.read(providerProfileProvider.notifier).uploadPhoto(File(picked.path));
   }
 
+  Future<void> _pickAndUploadLogo() async {
+    final source = await _showSourceSheet(context);
+    if (source == null || !mounted) return;
+    final picked = await ImagePicker().pickImage(source: source, imageQuality: 90, maxWidth: 1024);
+    if (picked == null || !mounted) return;
+    final err = await ref.read(providerProfileProvider.notifier).uploadLogo(File(picked.path));
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(err ?? 'Logo güncellendi'),
+        backgroundColor: err == null ? AppColors.blue600 : AppColors.red700,
+        behavior: SnackBarBehavior.floating,
+      ),
+    );
+  }
+
+  int? _logoDaysLeft() {
+    final updatedAt = ref.read(providerProfileProvider).profile?['logoUpdatedAt'] as String?;
+    if (updatedAt == null) return null;
+    try {
+      final dt = DateTime.parse(updatedAt);
+      final daysSince = DateTime.now().difference(dt).inHours / 24;
+      const limit = 7;
+      if (daysSince >= limit) return null;
+      return (limit - daysSince).ceil();
+    } catch (_) {
+      return null;
+    }
+  }
+
   Future<ImageSource?> _showSourceSheet(BuildContext context) {
     return showModalBottomSheet<ImageSource>(
       context: context,
@@ -890,7 +920,10 @@ class _ProfileEditSheetState extends ConsumerState<_ProfileEditSheet> {
     final sheetState = ref.watch(providerProfileProvider);
     final saving = sheetState.saving;
     final uploading = sheetState.uploadingPhoto;
+    final uploadingLogo = sheetState.uploadingLogo;
     final photos = sheetState.photos;
+    final logoUrl = sheetState.profile?['logoUrl'] as String?;
+    final daysLeft = _logoDaysLeft();
     final bottom = MediaQuery.of(context).viewInsets.bottom;
     final screenHeight = MediaQuery.of(context).size.height;
 
@@ -928,6 +961,99 @@ class _ProfileEditSheetState extends ConsumerState<_ProfileEditSheet> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
+                  // ── Logo ─────────────────────────────────────────────
+                  const Row(
+                    children: [
+                      Icon(Icons.workspace_premium_outlined, size: 14, color: AppColors.gray500),
+                      SizedBox(width: 6),
+                      Text('İşletme Logosu', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: AppColors.gray700)),
+                    ],
+                  ),
+                  const SizedBox(height: 10),
+                  Row(
+                    children: [
+                      Container(
+                        width: 64,
+                        height: 64,
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFEFF6FF),
+                          borderRadius: BorderRadius.circular(14),
+                          border: Border.all(color: AppColors.gray200),
+                        ),
+                        child: logoUrl != null && logoUrl.isNotEmpty
+                            ? ClipRRect(
+                                borderRadius: BorderRadius.circular(13),
+                                child: CachedNetworkImage(
+                                  imageUrl: logoUrl,
+                                  fit: BoxFit.cover,
+                                  errorWidget: (ctx, url, err) => const Icon(Icons.storefront_outlined, color: AppColors.blue600),
+                                ),
+                              )
+                            : const Icon(Icons.storefront_outlined, size: 28, color: AppColors.blue600),
+                      ),
+                      const SizedBox(width: 14),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            GestureDetector(
+                              onTap: (uploadingLogo || daysLeft != null) ? null : _pickAndUploadLogo,
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                                decoration: BoxDecoration(
+                                  color: (uploadingLogo || daysLeft != null)
+                                      ? AppColors.gray100
+                                      : AppColors.blue600.withValues(alpha: 0.08),
+                                  borderRadius: BorderRadius.circular(8),
+                                  border: Border.all(
+                                    color: (uploadingLogo || daysLeft != null)
+                                        ? AppColors.gray200
+                                        : AppColors.blue600.withValues(alpha: 0.3),
+                                  ),
+                                ),
+                                child: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    if (uploadingLogo)
+                                      const SizedBox(width: 14, height: 14, child: CircularProgressIndicator(strokeWidth: 2, color: AppColors.blue600))
+                                    else
+                                      Icon(
+                                        logoUrl != null && logoUrl.isNotEmpty ? Icons.refresh : Icons.upload_outlined,
+                                        size: 14,
+                                        color: daysLeft != null ? AppColors.gray400 : AppColors.blue600,
+                                      ),
+                                    const SizedBox(width: 6),
+                                    Text(
+                                      logoUrl != null && logoUrl.isNotEmpty ? 'Logoyu Güncelle' : 'Logo Yükle',
+                                      style: TextStyle(
+                                        fontSize: 12,
+                                        fontWeight: FontWeight.w600,
+                                        color: daysLeft != null ? AppColors.gray400 : AppColors.blue600,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                            const SizedBox(height: 6),
+                            Text(
+                              daysLeft != null
+                                  ? 'Sonraki değişiklik: $daysLeft gün sonra'
+                                  : 'JPEG/PNG/WebP/SVG · max 2 MB',
+                              style: TextStyle(
+                                fontSize: 11,
+                                color: daysLeft != null ? AppColors.amber600 : AppColors.gray400,
+                                fontWeight: daysLeft != null ? FontWeight.w500 : FontWeight.w400,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 20),
+                  const Divider(),
+                  const SizedBox(height: 16),
                   // ── Fotoğraflar ──────────────────────────────────────
                   Row(
                     children: [

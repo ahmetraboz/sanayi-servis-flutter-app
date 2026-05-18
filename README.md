@@ -1,17 +1,47 @@
-# sanayi_servis_app
+# Sanayi Servis App
 
-A new Flutter project.
+Servis sağlayıcılar için Flutter uygulaması.
 
-## Getting Started
+## İlk Kurulum
 
-This project is a starting point for a Flutter application.
+### 1. `.env` dosyasını yerleştir
 
-A few resources to get you started if this is your first Flutter project:
+Ekipten aldığın `.env` dosyasını repo'nun **ana klasörüne** (pubspec.yaml'ın yanına) koy:
 
-- [Learn Flutter](https://docs.flutter.dev/get-started/learn-flutter)
-- [Write your first Flutter app](https://docs.flutter.dev/get-started/codelab)
-- [Flutter learning resources](https://docs.flutter.dev/reference/learning-resources)
+```
+sanayi-servis-flutter-app/
+├── .env              ← BURAYA KOY
+├── pubspec.yaml
+├── lib/
+├── android/
+├── ios/
+└── scripts/
+    └── setup.sh
+```
 
-For help getting started with Flutter development, view the
-[online documentation](https://docs.flutter.dev/), which offers tutorials,
-samples, guidance on mobile development, and a full API reference.
+`.env` dosyasının içeriği:
+```
+GOOGLE_MAPS_KEY=buraya_key_yaz
+```
+
+### 2. Setup script'ini çalıştır
+
+```bash
+./scripts/setup.sh
+```
+
+Bu script `.env` içindeki key'i okuyup şu dosyaları **otomatik üretir**:
+- `android/local.properties` → Android build'ine enjekte edilir
+- `ios/Flutter/Maps.xcconfig` → iOS build'ine enjekte edilir
+
+### 3. Bağımlılıkları yükle ve çalıştır
+
+```bash
+flutter pub get
+cd ios && pod install && cd ..
+flutter run
+```
+
+---
+
+> **Not:** `.env`, `android/local.properties` ve `ios/Flutter/Maps.xcconfig` dosyaları gitignore'dadır — commitleme, her geliştirici kendi makinasında oluşturur.
