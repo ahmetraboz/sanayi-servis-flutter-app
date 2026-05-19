@@ -29,7 +29,7 @@ class JobModel {
     providerId: json['providerId'] as int,
     customerId: json['customerId'] as int,
     status: json['status'] as String,
-    agreedPrice: (json['agreedPrice'] as num?)?.toDouble() ?? 0.0,
+    agreedPrice: double.tryParse(json['agreedPrice']?.toString() ?? '') ?? 0.0,
     startedAt: json['startedAt'] != null ? DateTime.tryParse(json['startedAt'] as String) : null,
     completedAt: json['completedAt'] != null ? DateTime.tryParse(json['completedAt'] as String) : null,
     createdAt: DateTime.tryParse(json['createdAt'] as String? ?? '') ?? DateTime.now(),
