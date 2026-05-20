@@ -9,6 +9,7 @@ class ProviderRequestDetailState {
   final String? error;
   final Map<String, dynamic>? request;
   final Map<String, dynamic>? acceptedBid;
+  final Map<String, dynamic>? myBid;
   final List<Map<String, dynamic>> updates;
   final Map<String, dynamic>? additionalInfo;
   final String? vehicleImageUrl;
@@ -24,6 +25,7 @@ class ProviderRequestDetailState {
     this.error,
     this.request,
     this.acceptedBid,
+    this.myBid,
     this.updates = const [],
     this.additionalInfo,
     this.vehicleImageUrl,
@@ -40,6 +42,7 @@ class ProviderRequestDetailState {
     Object? error = _sentinel,
     Object? request = _sentinel,
     Object? acceptedBid = _sentinel,
+    Object? myBid = _sentinel,
     List<Map<String, dynamic>>? updates,
     Object? additionalInfo = _sentinel,
     Object? vehicleImageUrl = _sentinel,
@@ -55,6 +58,7 @@ class ProviderRequestDetailState {
       error: identical(error, _sentinel) ? this.error : error as String?,
       request: identical(request, _sentinel) ? this.request : request as Map<String, dynamic>?,
       acceptedBid: identical(acceptedBid, _sentinel) ? this.acceptedBid : acceptedBid as Map<String, dynamic>?,
+      myBid: identical(myBid, _sentinel) ? this.myBid : myBid as Map<String, dynamic>?,
       updates: updates ?? this.updates,
       additionalInfo: identical(additionalInfo, _sentinel) ? this.additionalInfo : additionalInfo as Map<String, dynamic>?,
       vehicleImageUrl: identical(vehicleImageUrl, _sentinel) ? this.vehicleImageUrl : vehicleImageUrl as String?,
@@ -68,8 +72,11 @@ class ProviderRequestDetailState {
   }
 
   String? get status => request?['status'] as String?;
-  bool get canBid => ['open', 'bidding', 'info_requested', 'info_provided'].contains(status);
-  bool get canRequestInfo => ['open', 'bidding'].contains(status);
+  String? get myBidStatus => myBid?['status'] as String?;
+  bool get canBid => ['open', 'bidding', 'info_requested', 'info_provided'].contains(status)
+      && myBidStatus != 'rejected';
+  bool get canRequestInfo => ['open', 'bidding'].contains(status)
+      && myBidStatus != 'rejected';
   bool get canUpdate => ['accepted', 'in_progress'].contains(status) && acceptedBid != null;
   bool get canComplete => canUpdate;
   bool get isInfoRequested => status == 'info_requested';
@@ -94,6 +101,7 @@ class ProviderRequestDetailNotifier extends StateNotifier<ProviderRequestDetailS
       final data = res.data as Map<String, dynamic>;
       final request = data['request'] as Map<String, dynamic>;
       final acceptedBid = data['acceptedBid'] as Map<String, dynamic>?;
+      final myBid = data['myBid'] as Map<String, dynamic>?;
       final updates = (data['updates'] as List? ?? [])
           .map((e) => e as Map<String, dynamic>)
           .toList();
@@ -111,6 +119,7 @@ class ProviderRequestDetailNotifier extends StateNotifier<ProviderRequestDetailS
         loading: false,
         request: request,
         acceptedBid: acceptedBid,
+        myBid: myBid,
         updates: updates,
         additionalInfo: additionalInfo,
       );

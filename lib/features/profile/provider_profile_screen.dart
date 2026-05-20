@@ -138,6 +138,8 @@ class _ProviderProfileScreenState extends ConsumerState<ProviderProfileScreen> {
             const SizedBox(height: 12),
             _InfoView(profile: profile),
             const SizedBox(height: 12),
+            _ServiceAreasCard(profile: profile),
+            const SizedBox(height: 12),
             _WorkingHoursCard(profile: profile),
             const SizedBox(height: 24),
           ],
@@ -788,6 +790,95 @@ class _InfoView extends StatelessWidget {
   }
 }
 
+// ─── Service Areas Card ───────────────────────────────────────────────────────
+
+const _kServiceAreas = [
+  (key: 'motor',    label: 'Motor',       icon: Icons.local_fire_department_outlined),
+  (key: 'elektrik', label: 'Elektrik',    icon: Icons.bolt_outlined),
+  (key: 'fren',     label: 'Frenler',     icon: Icons.do_not_disturb_on_outlined),
+  (key: 'suspan',   label: 'Süspansiyon', icon: Icons.tune_outlined),
+  (key: 'kaporta',  label: 'Kaporta',     icon: Icons.brush_outlined),
+  (key: 'klima',    label: 'Klima',       icon: Icons.ac_unit_outlined),
+  (key: 'lastik',   label: 'Lastik',      icon: Icons.tire_repair_outlined),
+  (key: 'vites',    label: 'Şanzıman',    icon: Icons.settings_outlined),
+  (key: 'egzoz',    label: 'Egzoz',       icon: Icons.cloud_outlined),
+  (key: 'diger',    label: 'Diğer',       icon: Icons.help_outline),
+];
+
+class _ServiceAreasCard extends StatelessWidget {
+  final Map<String, dynamic> profile;
+
+  const _ServiceAreasCard({required this.profile});
+
+  List<String> _parseAreas() {
+    final raw = profile['serviceAreas'] as String?;
+    if (raw == null || raw.isEmpty) return [];
+    try {
+      return (jsonDecode(raw) as List).cast<String>();
+    } catch (_) {
+      return [];
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final areas = _parseAreas();
+
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: AppColors.gray200),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Padding(
+            padding: EdgeInsets.fromLTRB(16, 14, 16, 0),
+            child: Row(
+              children: [
+                Icon(Icons.build_circle_outlined, size: 16, color: AppColors.blue600),
+                SizedBox(width: 8),
+                Text('Hizmet Alanları', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 14, color: AppColors.gray900)),
+              ],
+            ),
+          ),
+          const Divider(height: 20, indent: 16, endIndent: 16),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+            child: areas.isEmpty
+                ? const Text('Henüz hizmet alanı eklenmedi', style: TextStyle(fontSize: 13, color: AppColors.gray400))
+                : Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: areas.map((key) {
+                      final area = _kServiceAreas.where((a) => a.key == key).firstOrNull;
+                      if (area == null) return const SizedBox.shrink();
+                      return Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                        decoration: BoxDecoration(
+                          color: AppColors.info50,
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(color: const Color(0xFFBFDBFE)),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(area.icon, size: 14, color: AppColors.blue600),
+                            const SizedBox(width: 5),
+                            Text(area.label, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w500, color: AppColors.blue600)),
+                          ],
+                        ),
+                      );
+                    }).toList(),
+                  ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 // ─── Working Hours Card ───────────────────────────────────────────────────────
 
 class _WorkingHoursCard extends StatelessWidget {
@@ -906,6 +997,7 @@ class _ProfileEditSheetState extends ConsumerState<_ProfileEditSheet> {
   late final TextEditingController _cityCtrl;
   late final TextEditingController _districtCtrl;
   late final TextEditingController _descriptionCtrl;
+  late List<String> _selectedServiceAreas;
   late Map<String, Map<String, dynamic>> _workingHours;
 
   @override
@@ -918,6 +1010,11 @@ class _ProfileEditSheetState extends ConsumerState<_ProfileEditSheet> {
     _cityCtrl        = TextEditingController(text: p['city']        as String? ?? '');
     _districtCtrl    = TextEditingController(text: p['district']    as String? ?? '');
     _descriptionCtrl = TextEditingController(text: p['description'] as String? ?? '');
+    final rawAreas = p['serviceAreas'] as String?;
+    _selectedServiceAreas = [];
+    if (rawAreas != null && rawAreas.isNotEmpty) {
+      try { _selectedServiceAreas = (jsonDecode(rawAreas) as List).cast<String>(); } catch (_) {}
+    }
     final raw = p['workingHours'] as String?;
     Map<String, dynamic> parsed = {};
     if (raw != null && raw.isNotEmpty) {
@@ -1008,7 +1105,7 @@ class _ProfileEditSheetState extends ConsumerState<_ProfileEditSheet> {
       'district':     _districtCtrl.text.trim(),
       'description':  _descriptionCtrl.text.trim(),
       'workingHours': jsonEncode(_workingHours),
-      if (widget.profile['serviceAreas'] != null) 'serviceAreas': widget.profile['serviceAreas'] as String,
+      'serviceAreas': jsonEncode(_selectedServiceAreas),
       if (widget.profile['googlePlaceId'] != null) 'googlePlaceId': widget.profile['googlePlaceId'] as String,
       if (widget.profile['latitude'] != null) 'latitude': widget.profile['latitude'] as String,
       if (widget.profile['longitude'] != null) 'longitude': widget.profile['longitude'] as String,
@@ -1297,6 +1394,62 @@ class _ProfileEditSheetState extends ConsumerState<_ProfileEditSheet> {
                   ),
                   const SizedBox(height: 12),
                   _Field(label: 'İşletme Açıklaması', ctrl: _descriptionCtrl, icon: Icons.description_outlined, maxLines: 4),
+                  const SizedBox(height: 20),
+                  const Divider(),
+                  const SizedBox(height: 16),
+                  // ── Hizmet Alanları ───────────────────────────────────
+                  const Row(
+                    children: [
+                      Icon(Icons.build_circle_outlined, size: 14, color: AppColors.gray500),
+                      SizedBox(width: 6),
+                      Text('Hizmet Alanları', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: AppColors.gray700)),
+                    ],
+                  ),
+                  const SizedBox(height: 4),
+                  const Text('İşletmenizin ilgilendiği alanları seçin', style: TextStyle(fontSize: 12, color: AppColors.gray400)),
+                  const SizedBox(height: 12),
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: _kServiceAreas.map((a) {
+                      final isSelected = _selectedServiceAreas.contains(a.key);
+                      return GestureDetector(
+                        onTap: () => setState(() {
+                          if (isSelected) {
+                            _selectedServiceAreas = _selectedServiceAreas.where((k) => k != a.key).toList();
+                          } else {
+                            _selectedServiceAreas = [..._selectedServiceAreas, a.key];
+                          }
+                        }),
+                        child: AnimatedContainer(
+                          duration: const Duration(milliseconds: 150),
+                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+                          decoration: BoxDecoration(
+                            color: isSelected ? AppColors.blue600 : AppColors.gray100,
+                            borderRadius: BorderRadius.circular(8),
+                            border: Border.all(
+                              color: isSelected ? AppColors.blue600 : AppColors.gray200,
+                            ),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(a.icon, size: 14, color: isSelected ? Colors.white : AppColors.gray500),
+                              const SizedBox(width: 5),
+                              Text(
+                                a.label,
+                                style: TextStyle(
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.w500,
+                                  color: isSelected ? Colors.white : AppColors.gray700,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      );
+                    }).toList(),
+                  ),
                   const SizedBox(height: 20),
                   const Divider(),
                   const SizedBox(height: 16),

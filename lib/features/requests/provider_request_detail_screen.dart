@@ -140,6 +140,26 @@ class ProviderRequestDetailScreen extends ConsumerWidget {
       children: [
         _HeaderCard(request: req),
         const SizedBox(height: 12),
+        if (state.myBidStatus == 'rejected') ...[
+          _StatusBanner(
+            icon: Icons.cancel_outlined,
+            color: AppColors.red700,
+            bg: AppColors.red50,
+            title: 'Teklifiniz Reddedildi',
+            subtitle: 'Müşteri bu talep için farklı bir servisi tercih etti.',
+          ),
+          const SizedBox(height: 12),
+        ],
+        if (state.myBidStatus == 'pending') ...[
+          _StatusBanner(
+            icon: Icons.hourglass_top_rounded,
+            color: const Color(0xFFD97706),
+            bg: const Color(0xFFFFFBEB),
+            title: 'Teklifiniz Değerlendiriliyor',
+            subtitle: 'Müşteri teklifinizi inceliyor.',
+          ),
+          const SizedBox(height: 12),
+        ],
         if (req['preferredDateFrom'] != null || req['preferredDateTo'] != null) ...[
           _PreferredDateBanner(
             dateFrom: req['preferredDateFrom'] as String?,
@@ -376,20 +396,27 @@ class _VehicleCard extends StatelessWidget {
                       ),
                     ),
                     const SizedBox(height: 4),
-                    Row(
+                    Wrap(
+                      spacing: 10,
+                      runSpacing: 4,
+                      crossAxisAlignment: WrapCrossAlignment.center,
                       children: [
-                        if (year != null) ...[
-                          const Icon(Icons.calendar_today_outlined, size: 13, color: AppColors.gray400),
-                          const SizedBox(width: 3),
-                          Text(
-                            '$year Model',
-                            style: const TextStyle(fontSize: 13, color: AppColors.gray500),
+                        if (year != null)
+                          Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              const Icon(Icons.calendar_today_outlined, size: 13, color: AppColors.gray400),
+                              const SizedBox(width: 3),
+                              Text(
+                                '$year Model',
+                                style: const TextStyle(fontSize: 13, color: AppColors.gray500),
+                              ),
+                            ],
                           ),
-                        ],
-                        if (year != null && plate != null) const SizedBox(width: 10),
                         if (plate != null)
                           Container(
                             padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                            constraints: const BoxConstraints(maxWidth: 160),
                             decoration: BoxDecoration(
                               color: AppColors.gray100,
                               borderRadius: BorderRadius.circular(6),
@@ -397,6 +424,8 @@ class _VehicleCard extends StatelessWidget {
                             ),
                             child: Text(
                               plate,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
                               style: const TextStyle(
                                 fontSize: 12,
                                 fontWeight: FontWeight.w700,
