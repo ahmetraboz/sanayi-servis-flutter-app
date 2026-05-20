@@ -7,9 +7,10 @@ import '../../../shared/widgets/page_header.dart';
 import '../../../shared/widgets/skeleton.dart';
 import 'provider_dashboard_notifier.dart';
 import 'widgets/active_jobs_section.dart';
+import 'widgets/dashboard_banner_carousel.dart';
 import 'widgets/provider_stat_cards.dart';
 import 'widgets/status_alert.dart';
-import 'widgets/acceptance_rate_widget.dart';
+
 
 class ProviderDashboardScreen extends ConsumerWidget {
   const ProviderDashboardScreen({super.key});
@@ -82,6 +83,8 @@ class ProviderDashboardScreen extends ConsumerWidget {
                 _ErrorCard(message: state.error!),
                 const SizedBox(height: 16),
               ],
+              const DashboardBannerCarousel(),
+              const SizedBox(height: 20),
               if (state.stats != null) ...[
                 const Text(
                   'İstatistikler',
@@ -93,8 +96,6 @@ class ProviderDashboardScreen extends ConsumerWidget {
                 ),
                 const SizedBox(height: 12),
                 ProviderStatCards(stats: state.stats!),
-                const SizedBox(height: 16),
-                AcceptanceRateWidget(stats: state.stats!),
                 const SizedBox(height: 24),
               ],
               if (state.activeJobs.isNotEmpty) ...[
@@ -172,6 +173,8 @@ class _DashboardSkeleton extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          SkeletonBox(height: 110, radius: 16),
+          const SizedBox(height: 20),
           // 2×2 stat grid — matches ProviderStatCards
           GridView.count(
             crossAxisCount: 2,
@@ -181,30 +184,6 @@ class _DashboardSkeleton extends StatelessWidget {
             shrinkWrap: true,
             physics: const NeverScrollableScrollPhysics(),
             children: List.generate(4, (_) => _statCard()),
-          ),
-          const SizedBox(height: 16),
-          // AcceptanceRateWidget skeleton
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(16),
-              border: Border.all(color: AppColors.gray200),
-            ),
-            child: const Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    SkeletonBox(height: 13, width: 140, radius: 4),
-                    SkeletonBox(height: 13, width: 36, radius: 4),
-                  ],
-                ),
-                SizedBox(height: 10),
-                SkeletonBox(height: 10, radius: 999),
-              ],
-            ),
           ),
           const SizedBox(height: 24),
           // ActiveJobsSection skeleton

@@ -101,45 +101,44 @@ class _FloatingNavBar extends StatelessWidget {
         child: Padding(
           padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 10),
           child: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceAround,
             children: [
-              _NavItem(
+              Expanded(child: _NavItem(
                 icon: Icons.dashboard_outlined,
                 selectedIcon: Icons.dashboard_rounded,
                 label: 'Anasayfa',
                 isSelected: selectedIndex == 0,
                 onTap: () => onTap(0),
-              ),
-              _NavItem(
+              )),
+              Expanded(child: _NavItem(
                 icon: Icons.inbox_outlined,
                 selectedIcon: Icons.inbox_rounded,
                 label: 'Talepler',
                 isSelected: selectedIndex == 1,
                 badge: counts.unreadNotifications,
                 onTap: () => onTap(1),
-              ),
-              _NavItem(
+              )),
+              Expanded(child: _NavItem(
                 icon: Icons.work_outline_rounded,
                 selectedIcon: Icons.work_rounded,
                 label: 'İşlerim',
                 isSelected: selectedIndex == 2,
                 onTap: () => onTap(2),
-              ),
-              _NavItem(
+              )),
+              Expanded(child: _NavItem(
                 icon: Icons.local_offer_outlined,
                 selectedIcon: Icons.local_offer_rounded,
                 label: 'Teklifler',
                 isSelected: selectedIndex == 3,
                 badge: counts.pendingBids,
                 onTap: () => onTap(3),
-              ),
-              _NavItem(
-                icon: Icons.person_outline_rounded,
-                selectedIcon: Icons.person_rounded,
-                label: 'Profil',
+              )),
+              Expanded(child: _NavItem(
+                icon: Icons.store_outlined,
+                selectedIcon: Icons.store_rounded,
+                label: 'İşletmem',
                 isSelected: selectedIndex == 4,
                 onTap: () => onTap(4),
-              ),
+              )),
             ],
           ),
         ),
@@ -193,7 +192,7 @@ class _NavItem extends StatelessWidget {
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 200),
         curve: Curves.easeInOut,
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+        padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 6),
         decoration: BoxDecoration(
           color: isSelected ? AppColors.blue600.withValues(alpha: 0.08) : Colors.transparent,
           borderRadius: BorderRadius.circular(18),
@@ -205,6 +204,8 @@ class _NavItem extends StatelessWidget {
             const SizedBox(height: 3),
             Text(
               label,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
               style: TextStyle(
                 fontSize: 10,
                 fontWeight: isSelected ? FontWeight.w600 : FontWeight.w400,

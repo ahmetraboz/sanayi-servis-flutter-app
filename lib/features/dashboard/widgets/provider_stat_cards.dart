@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import '../../../../core/theme/theme.dart';
 import '../models/provider_stats.dart';
 
@@ -16,6 +17,7 @@ class ProviderStatCards extends StatelessWidget {
         icon: Icons.inbox_outlined,
         iconColor: AppColors.blue600,
         bgColor: AppColors.info50,
+        route: '/provider/requests',
       ),
       _StatConfig(
         label: 'Bekleyen Teklifler',
@@ -23,6 +25,7 @@ class ProviderStatCards extends StatelessWidget {
         icon: Icons.pending_outlined,
         iconColor: AppColors.amber600,
         bgColor: AppColors.amber50,
+        route: '/provider/bids',
       ),
       _StatConfig(
         label: 'Kabul Edilen',
@@ -30,6 +33,7 @@ class ProviderStatCards extends StatelessWidget {
         icon: Icons.check_circle_outline,
         iconColor: AppColors.green700,
         bgColor: AppColors.green50,
+        route: '/provider/jobs',
       ),
       _StatConfig(
         label: 'Ortalama Puan',
@@ -37,6 +41,7 @@ class ProviderStatCards extends StatelessWidget {
         icon: Icons.star_outline,
         iconColor: const Color(0xFFF59E0B),
         bgColor: const Color(0xFFFFFBEB),
+        route: '/provider/profile',
       ),
     ];
 
@@ -58,6 +63,7 @@ class _StatConfig {
   final IconData icon;
   final Color iconColor;
   final Color bgColor;
+  final String route;
 
   const _StatConfig({
     required this.label,
@@ -65,6 +71,7 @@ class _StatConfig {
     required this.icon,
     required this.iconColor,
     required this.bgColor,
+    required this.route,
   });
 }
 
@@ -75,46 +82,53 @@ class _StatCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: Colors.white,
+    return Material(
+      color: Colors.white,
+      borderRadius: BorderRadius.circular(14),
+      child: InkWell(
         borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: AppColors.gray200),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          Container(
-            width: 36,
-            height: 36,
-            decoration: BoxDecoration(
-              color: config.bgColor,
-              borderRadius: BorderRadius.circular(8),
-            ),
-            child: Center(
-              child: Icon(config.icon, size: 18, color: config.iconColor),
-            ),
+        onTap: () => context.go(config.route),
+        child: Container(
+          padding: const EdgeInsets.all(14),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(color: AppColors.gray200),
           ),
-          Column(
+          child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Text(
-                config.value,
-                style: const TextStyle(
-                  fontSize: 22,
-                  fontWeight: FontWeight.w700,
-                  color: AppColors.gray900,
+              Container(
+                width: 36,
+                height: 36,
+                decoration: BoxDecoration(
+                  color: config.bgColor,
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Center(
+                  child: Icon(config.icon, size: 18, color: config.iconColor),
                 ),
               ),
-              Text(
-                config.label,
-                style: const TextStyle(fontSize: 12, color: AppColors.gray500),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    config.value,
+                    style: const TextStyle(
+                      fontSize: 22,
+                      fontWeight: FontWeight.w700,
+                      color: AppColors.gray900,
+                    ),
+                  ),
+                  Text(
+                    config.label,
+                    style: const TextStyle(fontSize: 12, color: AppColors.gray500),
+                  ),
+                ],
               ),
             ],
           ),
-        ],
+        ),
       ),
     );
   }

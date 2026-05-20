@@ -244,12 +244,12 @@ class _Pill extends StatelessWidget {
       context: context,
       backgroundColor: Colors.transparent,
       isScrollControlled: true,
-      builder: (_) => _PickerSheet(
+      builder: (sheetCtx) => _PickerSheet(
         title: label,
         filters: filters,
         activeKey: activeKey,
         onChanged: onChanged,
-        onDone: () => Navigator.of(context).pop(),
+        onDone: () => Navigator.of(sheetCtx).pop(),
       ),
     );
   }
