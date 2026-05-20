@@ -56,6 +56,7 @@ class ProviderBidsNotifier extends StateNotifier<ProviderBidsState> {
   }
 
   Future<void> fetchBids({int page = 1}) async {
+    if (!mounted) return;
     state = state.copyWith(loading: true, error: null);
     try {
       final params = <String, String>{'page': '$page', 'limit': '20'};
@@ -72,6 +73,7 @@ class ProviderBidsNotifier extends StateNotifier<ProviderBidsState> {
         'rejected': (rawCounts['rejected'] as int?) ?? 0,
       };
 
+      if (!mounted) return;
       state = state.copyWith(
         loading: false,
         bids: data,
@@ -81,6 +83,7 @@ class ProviderBidsNotifier extends StateNotifier<ProviderBidsState> {
         counts: counts,
       );
     } on DioException catch (e) {
+      if (!mounted) return;
       state = state.copyWith(loading: false, error: e.message ?? 'Teklifler yüklenemedi');
     }
   }

@@ -47,6 +47,7 @@ class ProviderDashboardNotifier extends StateNotifier<ProviderDashboardState> {
   }
 
   Future<void> load() async {
+    if (!mounted) return;
     state = state.copyWith(loading: true, error: null);
     try {
       final results = await Future.wait([
@@ -54,6 +55,7 @@ class ProviderDashboardNotifier extends StateNotifier<ProviderDashboardState> {
         _repo.fetchActiveJobs(),
         _repo.fetchRecentRequests(),
       ]);
+      if (!mounted) return;
       state = state.copyWith(
         loading: false,
         stats: results[0] as ProviderStats,
@@ -61,6 +63,7 @@ class ProviderDashboardNotifier extends StateNotifier<ProviderDashboardState> {
         recentRequests: results[2] as List<OpenRequestPreview>,
       );
     } catch (e) {
+      if (!mounted) return;
       state = state.copyWith(
         loading: false,
         error: e is ApiException ? e.message : 'Veriler yüklenemedi',

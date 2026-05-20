@@ -41,56 +41,72 @@ class ProviderJobsScreen extends ConsumerWidget {
     }
 
     if (state.error != null) {
-      return Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            const Icon(Icons.error_outline, size: 48, color: AppColors.gray300),
-            const SizedBox(height: 12),
-            Text(state.error!, style: const TextStyle(color: AppColors.gray500, fontSize: 14), textAlign: TextAlign.center),
-          ],
-        ),
+      return ListView(
+        physics: const AlwaysScrollableScrollPhysics(),
+        children: [
+          SizedBox(
+            height: 400,
+            child: Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  const Icon(Icons.error_outline, size: 48, color: AppColors.gray300),
+                  const SizedBox(height: 12),
+                  Text(state.error!, style: const TextStyle(color: AppColors.gray500, fontSize: 14), textAlign: TextAlign.center),
+                ],
+              ),
+            ),
+          ),
+        ],
       );
     }
 
     if (state.jobs.isEmpty) {
-      return Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Container(
-              width: 64,
-              height: 64,
-              decoration: BoxDecoration(color: AppColors.gray100, borderRadius: BorderRadius.circular(16)),
-              child: const Icon(Icons.work_outline, size: 32, color: AppColors.gray300),
-            ),
-            const SizedBox(height: 16),
-            const Text('Henüz aktif işiniz yok', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600, color: AppColors.gray900)),
-            const SizedBox(height: 8),
-            const Padding(
-              padding: EdgeInsets.symmetric(horizontal: 48),
-              child: Text(
-                'Taleplere teklif verin ve müşteri kabulünden sonra burada görünecek',
-                style: TextStyle(fontSize: 13, color: AppColors.gray500),
-                textAlign: TextAlign.center,
+      return ListView(
+        physics: const AlwaysScrollableScrollPhysics(),
+        children: [
+          SizedBox(
+            height: 500,
+            child: Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Container(
+                    width: 64,
+                    height: 64,
+                    decoration: BoxDecoration(color: AppColors.gray100, borderRadius: BorderRadius.circular(16)),
+                    child: const Icon(Icons.work_outline, size: 32, color: AppColors.gray300),
+                  ),
+                  const SizedBox(height: 16),
+                  const Text('Henüz aktif işiniz yok', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600, color: AppColors.gray900)),
+                  const SizedBox(height: 8),
+                  const Padding(
+                    padding: EdgeInsets.symmetric(horizontal: 48),
+                    child: Text(
+                      'Taleplere teklif verin ve müşteri kabulünden sonra burada görünecek',
+                      style: TextStyle(fontSize: 13, color: AppColors.gray500),
+                      textAlign: TextAlign.center,
+                    ),
+                  ),
+                  const SizedBox(height: 20),
+                  ElevatedButton.icon(
+                    onPressed: () => context.go('/provider/requests'),
+                    icon: const Icon(Icons.description_outlined, size: 16),
+                    label: const Text('Açık Taleplere Git', style: TextStyle(fontSize: 14)),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppColors.blue600,
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+                      minimumSize: Size.zero,
+                      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                    ),
+                  ),
+                ],
               ),
             ),
-            const SizedBox(height: 20),
-            ElevatedButton.icon(
-              onPressed: () => context.go('/provider/requests'),
-              icon: const Icon(Icons.description_outlined, size: 16),
-              label: const Text('Açık Taleplere Git', style: TextStyle(fontSize: 14)),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: AppColors.blue600,
-                foregroundColor: Colors.white,
-                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
-                minimumSize: Size.zero,
-                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-              ),
-            ),
-          ],
-        ),
+          ),
+        ],
       );
     }
 

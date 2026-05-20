@@ -98,56 +98,72 @@ class ProviderRequestsScreen extends ConsumerWidget {
     }
 
     if (state.error != null && state.requests.isEmpty) {
-      return Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            const Icon(Icons.error_outline, size: 48, color: AppColors.gray300),
-            const SizedBox(height: 16),
-            Text(
-              state.error!,
-              style: const TextStyle(color: AppColors.gray500, fontSize: 14),
-              textAlign: TextAlign.center,
-            ),
-            const SizedBox(height: 16),
-            ElevatedButton(
-              onPressed: () => notifier.fetchRequests(page: 1),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: AppColors.primary600,
-                foregroundColor: Colors.white,
+      return ListView(
+        physics: const AlwaysScrollableScrollPhysics(),
+        children: [
+          SizedBox(
+            height: 400,
+            child: Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  const Icon(Icons.error_outline, size: 48, color: AppColors.gray300),
+                  const SizedBox(height: 16),
+                  Text(
+                    state.error!,
+                    style: const TextStyle(color: AppColors.gray500, fontSize: 14),
+                    textAlign: TextAlign.center,
+                  ),
+                  const SizedBox(height: 16),
+                  ElevatedButton(
+                    onPressed: () => notifier.fetchRequests(page: 1),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppColors.primary600,
+                      foregroundColor: Colors.white,
+                    ),
+                    child: const Text('Tekrar Dene'),
+                  ),
+                ],
               ),
-              child: const Text('Tekrar Dene'),
             ),
-          ],
-        ),
+          ),
+        ],
       );
     }
 
     if (state.requests.isEmpty) {
-      return Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            const Icon(Icons.build_circle_outlined, size: 64, color: AppColors.gray300),
-            const SizedBox(height: 16),
-            Text(
-              state.activeCategory == 'all' ? 'Açık talep yok' : 'Bu kategoride talep bulunamadı',
-              style: const TextStyle(
-                fontSize: 18,
-                fontWeight: FontWeight.bold,
-                color: AppColors.gray900,
+      return ListView(
+        physics: const AlwaysScrollableScrollPhysics(),
+        children: [
+          SizedBox(
+            height: 400,
+            child: Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  const Icon(Icons.build_circle_outlined, size: 64, color: AppColors.gray300),
+                  const SizedBox(height: 16),
+                  Text(
+                    state.activeCategory == 'all' ? 'Açık talep yok' : 'Bu kategoride talep bulunamadı',
+                    style: const TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                      color: AppColors.gray900,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    state.activeCategory == 'all'
+                        ? 'Şu an için size yönlendirilmiş açık servis talebi bulunmuyor.'
+                        : 'Farklı bir kategori filtresi deneyin.',
+                    style: const TextStyle(color: AppColors.gray500, fontSize: 14),
+                    textAlign: TextAlign.center,
+                  ),
+                ],
               ),
             ),
-            const SizedBox(height: 8),
-            Text(
-              state.activeCategory == 'all'
-                  ? 'Şu an için size yönlendirilmiş açık servis talebi bulunmuyor.'
-                  : 'Farklı bir kategori filtresi deneyin.',
-              style: const TextStyle(color: AppColors.gray500, fontSize: 14),
-              textAlign: TextAlign.center,
-            ),
-          ],
-        ),
+          ),
+        ],
       );
     }
 

@@ -1,14 +1,12 @@
 import 'package:go_router/go_router.dart';
 import '../../features/dashboard/provider_dashboard_screen.dart';
 import '../../features/requests/provider_requests_screen.dart';
-import '../../features/requests/provider_request_detail_screen.dart';
 import '../../features/bids/provider_bids_screen.dart';
 import '../../features/jobs/provider_jobs_screen.dart';
 import '../../features/notifications/provider_notifications_screen.dart';
 import '../../features/profile/provider_profile_screen.dart';
 import '../../features/reviews/provider_reviews_screen.dart';
 import '../../features/guest_bookings/provider_guest_bookings_screen.dart';
-import '../../features/guest_bookings/provider_guest_booking_detail_screen.dart';
 import '../../features/shell/provider_shell.dart';
 
 final providerShellRoute = ShellRoute(
@@ -21,12 +19,6 @@ final providerShellRoute = ShellRoute(
     GoRoute(
       path: '/provider/requests',
       builder: (context, state) => const ProviderRequestsScreen(),
-    ),
-    GoRoute(
-      path: '/provider/requests/:id',
-      builder: (context, state) => ProviderRequestDetailScreen(
-        requestId: int.parse(state.pathParameters['id']!),
-      ),
     ),
     GoRoute(
       path: '/provider/jobs',
@@ -51,12 +43,6 @@ final providerShellRoute = ShellRoute(
     GoRoute(
       path: '/provider/guest-bookings',
       builder: (context, state) => const ProviderGuestBookingsScreen(),
-    ),
-    GoRoute(
-      path: '/provider/guest-bookings/:id',
-      builder: (context, state) => ProviderGuestBookingDetailScreen(
-        bookingId: int.parse(state.pathParameters['id']!),
-      ),
     ),
   ],
 );

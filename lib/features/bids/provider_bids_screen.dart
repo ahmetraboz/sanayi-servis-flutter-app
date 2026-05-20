@@ -69,52 +69,68 @@ class ProviderBidsScreen extends ConsumerWidget {
     }
 
     if (state.error != null && state.bids.isEmpty) {
-      return Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            const Icon(Icons.error_outline, size: 48, color: AppColors.gray300),
-            const SizedBox(height: 12),
-            Text(state.error!, style: const TextStyle(color: AppColors.gray500, fontSize: 14), textAlign: TextAlign.center),
-            const SizedBox(height: 12),
-            TextButton(
-              onPressed: () => notifier.fetchBids(page: 1),
-              child: const Text('Tekrar Dene', style: TextStyle(color: AppColors.blue600)),
+      return ListView(
+        physics: const AlwaysScrollableScrollPhysics(),
+        children: [
+          SizedBox(
+            height: 400,
+            child: Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  const Icon(Icons.error_outline, size: 48, color: AppColors.gray300),
+                  const SizedBox(height: 12),
+                  Text(state.error!, style: const TextStyle(color: AppColors.gray500, fontSize: 14), textAlign: TextAlign.center),
+                  const SizedBox(height: 12),
+                  TextButton(
+                    onPressed: () => notifier.fetchBids(page: 1),
+                    child: const Text('Tekrar Dene', style: TextStyle(color: AppColors.blue600)),
+                  ),
+                ],
+              ),
             ),
-          ],
-        ),
+          ),
+        ],
       );
     }
 
     if (state.bids.isEmpty) {
-      return Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            const Icon(Icons.inbox_outlined, size: 64, color: AppColors.gray300),
-            const SizedBox(height: 16),
-            Text(
-              state.activeTab == 'all' ? 'Henüz teklif vermediniz' : 'Bu kategoride teklif yok',
-              style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600, color: AppColors.gray700),
-            ),
-            if (state.activeTab == 'all') ...[
-              const SizedBox(height: 12),
-              ElevatedButton.icon(
-                onPressed: () => context.go('/provider/requests'),
-                icon: const Icon(Icons.description_outlined, size: 16),
-                label: const Text('Taleplere Git', style: TextStyle(fontSize: 14)),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: AppColors.blue600,
-                  foregroundColor: Colors.white,
-                  padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
-                  minimumSize: Size.zero,
-                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                ),
+      return ListView(
+        physics: const AlwaysScrollableScrollPhysics(),
+        children: [
+          SizedBox(
+            height: 400,
+            child: Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  const Icon(Icons.inbox_outlined, size: 64, color: AppColors.gray300),
+                  const SizedBox(height: 16),
+                  Text(
+                    state.activeTab == 'all' ? 'Henüz teklif vermediniz' : 'Bu kategoride teklif yok',
+                    style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600, color: AppColors.gray700),
+                  ),
+                  if (state.activeTab == 'all') ...[
+                    const SizedBox(height: 12),
+                    ElevatedButton.icon(
+                      onPressed: () => context.go('/provider/requests'),
+                      icon: const Icon(Icons.description_outlined, size: 16),
+                      label: const Text('Taleplere Git', style: TextStyle(fontSize: 14)),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: AppColors.blue600,
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+                        minimumSize: Size.zero,
+                        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                      ),
+                    ),
+                  ],
+                ],
               ),
-            ],
-          ],
-        ),
+            ),
+          ),
+        ],
       );
     }
 

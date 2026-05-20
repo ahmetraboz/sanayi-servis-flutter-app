@@ -45,14 +45,17 @@ class ProviderJobsNotifier extends StateNotifier<ProviderJobsState> {
   }
 
   Future<void> fetchJobs() async {
+    if (!mounted) return;
     state = state.copyWith(loading: true, error: null);
     try {
       final res = await _api.get('/api/provider/jobs');
       final jobs = (res.data['jobs'] as List? ?? [])
           .map((e) => e as Map<String, dynamic>)
           .toList();
+      if (!mounted) return;
       state = state.copyWith(loading: false, jobs: jobs);
     } on DioException catch (e) {
+      if (!mounted) return;
       state = state.copyWith(loading: false, error: e.message ?? 'İşler yüklenemedi');
     }
   }
