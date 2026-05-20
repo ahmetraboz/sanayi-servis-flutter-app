@@ -91,7 +91,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
               if (b.longitude != null) 'longitude': '${b.longitude}',
               if (b.googlePlaceId != null && b.googlePlaceId!.isNotEmpty) 'googlePlaceId': b.googlePlaceId,
               if (b.workingHours != null) 'workingHours': jsonEncode(b.workingHours),
-              if (_selectedServiceAreas.isNotEmpty) 'serviceAreas': jsonEncode(_selectedServiceAreas),
+              if (_selectedServiceAreas.isNotEmpty) 'serviceAreas': _selectedServiceAreas,
               if (_taxCtrl.text.trim().isNotEmpty) 'taxNumber': _taxCtrl.text.trim(),
               if (_descCtrl.text.trim().isNotEmpty) 'description': _descCtrl.text.trim(),
             },
