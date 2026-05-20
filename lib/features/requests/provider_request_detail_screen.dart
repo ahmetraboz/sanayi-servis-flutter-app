@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:url_launcher/url_launcher.dart';
+import '../../../core/api/services/provider_api_service.dart';
 import '../../../core/theme/theme.dart';
 import '../../../shared/widgets/date_picker_sheet.dart';
 import 'provider_open_requests_notifier.dart';
@@ -57,6 +58,7 @@ class ProviderRequestDetailScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final state = ref.watch(providerRequestDetailProvider(requestId));
     final notifier = ref.read(providerRequestDetailProvider(requestId).notifier);
+    final kdvRate = ref.watch(kdvRateProvider).valueOrNull ?? 20.0;
 
     return Scaffold(
       backgroundColor: AppColors.gray50,
@@ -84,6 +86,8 @@ class ProviderRequestDetailScreen extends ConsumerWidget {
             Expanded(child: _buildContent(context, state, notifier)),
             if (state.request != null && state.canBid)
               _ActionBar(state: state, notifier: notifier, requestId: requestId),
+            if (state.request != null && (state.canUpdate || state.canComplete))
+              _JobActionBar(state: state, notifier: notifier, kdvRate: kdvRate),
           ],
         ),
       ),
@@ -793,9 +797,17 @@ class _JobLogCard extends StatelessWidget {
                   final cfg = _typeConfig(type);
                   final desc = update['description'] as String? ?? '';
                   final parts = update['partsUsed'] as String?;
-                  final laborCost = update['laborCost'];
-                  final partsCost = update['partsCost'];
-                  final totalCost = update['totalCost'];
+                  final rawCostItems = update['costItems'];
+                  final updateCostItems = rawCostItems is List
+                      ? rawCostItems.whereType<Map<String, dynamic>>().toList()
+                      : <Map<String, dynamic>>[];
+                  final kdvAmount = update['kdvAmount'];
+                  final kdvRate = update['kdvRate'];
+                  final costSubtotal = updateCostItems.fold<double>(
+                    0,
+                    (s, e) => s + ((e['amount'] as num?)?.toDouble() ?? 0),
+                  );
+                  final costTotal = costSubtotal + ((kdvAmount as num?)?.toDouble() ?? 0);
                   final createdAt = update['createdAt'] as String?;
                   final isLast = i == updates.length - 1;
 
@@ -870,56 +882,61 @@ class _JobLogCard extends StatelessWidget {
                                           ],
                                         ),
                                       ],
-                                      if (totalCost != null || laborCost != null || partsCost != null) ...[
+                                      if (updateCostItems.isNotEmpty) ...[
                                         const SizedBox(height: 8),
-                                        Row(
-                                          children: [
-                                            if (laborCost != null)
-                                              Expanded(
-                                                child: Container(
-                                                  padding: const EdgeInsets.all(8),
-                                                  decoration: BoxDecoration(color: AppColors.gray50, borderRadius: BorderRadius.circular(8)),
-                                                  child: Column(
-                                                    children: [
-                                                      const Text('İşçilik', style: TextStyle(fontSize: 10, color: AppColors.gray400)),
-                                                      Text('${_formatCost(laborCost)} ₺', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: AppColors.gray900)),
-                                                    ],
-                                                  ),
+                                        Container(
+                                          padding: const EdgeInsets.all(10),
+                                          decoration: BoxDecoration(
+                                            color: AppColors.gray50,
+                                            borderRadius: BorderRadius.circular(8),
+                                          ),
+                                          child: Column(
+                                            children: [
+                                              ...updateCostItems.map((item) => Padding(
+                                                padding: const EdgeInsets.only(bottom: 4),
+                                                child: Row(
+                                                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                                  children: [
+                                                    Text(
+                                                      item['name']?.toString() ?? '',
+                                                      style: const TextStyle(fontSize: 12, color: AppColors.gray600),
+                                                    ),
+                                                    Text(
+                                                      '${_formatCost(item['amount'])} ₺',
+                                                      style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: AppColors.gray900),
+                                                    ),
+                                                  ],
                                                 ),
-                                              ),
-                                            if (laborCost != null && partsCost != null) const SizedBox(width: 6),
-                                            if (partsCost != null)
-                                              Expanded(
-                                                child: Container(
-                                                  padding: const EdgeInsets.all(8),
-                                                  decoration: BoxDecoration(color: AppColors.gray50, borderRadius: BorderRadius.circular(8)),
-                                                  child: Column(
-                                                    children: [
-                                                      const Text('Parça', style: TextStyle(fontSize: 10, color: AppColors.gray400)),
-                                                      Text('${_formatCost(partsCost)} ₺', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: AppColors.gray900)),
-                                                    ],
-                                                  ),
+                                              )),
+                                              if (kdvAmount != null) ...[
+                                                const Divider(height: 10, color: AppColors.gray200),
+                                                Row(
+                                                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                                  children: [
+                                                    Text(
+                                                      'KDV (%${(kdvRate as num?)?.toInt() ?? 0})',
+                                                      style: const TextStyle(fontSize: 11, color: AppColors.gray400),
+                                                    ),
+                                                    Text(
+                                                      '${_formatCost(kdvAmount)} ₺',
+                                                      style: const TextStyle(fontSize: 11, color: AppColors.gray500),
+                                                    ),
+                                                  ],
                                                 ),
-                                              ),
-                                            if ((laborCost != null || partsCost != null) && totalCost != null) const SizedBox(width: 6),
-                                            if (totalCost != null)
-                                              Expanded(
-                                                child: Container(
-                                                  padding: const EdgeInsets.all(8),
-                                                  decoration: BoxDecoration(
-                                                    color: const Color(0xFFF0FDF4),
-                                                    borderRadius: BorderRadius.circular(8),
-                                                    border: Border.all(color: const Color(0xFF6EE7B7)),
+                                              ],
+                                              const Divider(height: 10, color: AppColors.gray200),
+                                              Row(
+                                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                                children: [
+                                                  const Text('Toplam', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: AppColors.gray700)),
+                                                  Text(
+                                                    '${_formatCost(costTotal)} ₺',
+                                                    style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w800, color: Color(0xFF15803D)),
                                                   ),
-                                                  child: Column(
-                                                    children: [
-                                                      const Text('Toplam', style: TextStyle(fontSize: 10, color: Color(0xFF059669))),
-                                                      Text('${_formatCost(totalCost)} ₺', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: Color(0xFF15803D))),
-                                                    ],
-                                                  ),
-                                                ),
+                                                ],
                                               ),
-                                          ],
+                                            ],
+                                          ),
                                         ),
                                       ],
                                     ],
@@ -1673,6 +1690,788 @@ class _BidSheetState extends State<_BidSheet> {
           ),
         ],
       ),
+    );
+  }
+}
+
+// ─── Job action bar (update / complete) ──────────────────────────────────────
+
+class _JobActionBar extends StatelessWidget {
+  final ProviderRequestDetailState state;
+  final ProviderRequestDetailNotifier notifier;
+  final double kdvRate;
+
+  const _JobActionBar({required this.state, required this.notifier, required this.kdvRate});
+
+  @override
+  Widget build(BuildContext context) {
+    final busy = state.postingUpdate || state.completing;
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      decoration: const BoxDecoration(
+        color: Colors.white,
+        border: Border(top: BorderSide(color: AppColors.gray200)),
+      ),
+      child: Row(
+        children: [
+          Expanded(
+            child: OutlinedButton.icon(
+              onPressed: busy ? null : () => _showUpdateSheet(context),
+              icon: const Icon(Icons.sync_rounded, size: 16),
+              label: const Text('Güncelleme Ekle', style: TextStyle(fontWeight: FontWeight.w600)),
+              style: OutlinedButton.styleFrom(
+                foregroundColor: AppColors.gray700,
+                side: const BorderSide(color: AppColors.gray300),
+                padding: const EdgeInsets.symmetric(vertical: 13),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              ),
+            ),
+          ),
+          const SizedBox(width: 8),
+          Expanded(
+            child: ElevatedButton.icon(
+              onPressed: busy ? null : () => _showCompleteSheet(context),
+              icon: state.completing
+                  ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                  : const Icon(Icons.check_circle_outline_rounded, size: 16),
+              label: const Text('İşi Tamamla', style: TextStyle(fontWeight: FontWeight.w600)),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFF16A34A),
+                foregroundColor: Colors.white,
+                padding: const EdgeInsets.symmetric(vertical: 13),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _showUpdateSheet(BuildContext context) async {
+    await showModalBottomSheet(
+      useRootNavigator: true,
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (_) => _JobUpdateSheet(
+        notifier: notifier,
+        initialKdvRate: kdvRate,
+        agreedPrice: state.acceptedBid?['price'],
+      ),
+    );
+  }
+
+  Future<void> _showCompleteSheet(BuildContext context) async {
+    await showModalBottomSheet(
+      useRootNavigator: true,
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (_) => _CompleteJobSheet(
+        notifier: notifier,
+        acceptedPrice: state.acceptedBid?['price'],
+        initialKdvRate: kdvRate,
+      ),
+    );
+  }
+}
+
+// ─── Job update bottom sheet ──────────────────────────────────────────────────
+
+class _JobUpdateSheet extends StatefulWidget {
+  final ProviderRequestDetailNotifier notifier;
+  final double initialKdvRate;
+  final dynamic agreedPrice;
+  const _JobUpdateSheet({required this.notifier, this.initialKdvRate = 20.0, this.agreedPrice});
+
+  @override
+  State<_JobUpdateSheet> createState() => _JobUpdateSheetState();
+}
+
+class _JobUpdateSheetState extends State<_JobUpdateSheet> {
+  String _updateType = 'progress';
+  final _descCtrl = TextEditingController();
+  final _partsCtrl = TextEditingController();
+  final _overBudgetCtrl = TextEditingController();
+  final List<Map<String, dynamic>> _costItems = [];
+  late double _kdvRate = widget.initialKdvRate;
+  final _itemNameCtrl = TextEditingController();
+  final _itemAmountCtrl = TextEditingController();
+  bool _submitting = false;
+
+  static const _updateTypes = [
+    ('progress', 'İlerleme'),
+    ('delay', 'Gecikme'),
+    ('issue', 'Sorun'),
+  ];
+
+  static const _kdvOptions = [0.0, 10.0, 20.0];
+
+  double get _subtotal => _costItems.fold(0, (s, e) => s + ((e['amount'] as num?)?.toDouble() ?? 0));
+  double get _kdvAmount => _subtotal * _kdvRate / 100;
+  double get _total => _subtotal + _kdvAmount;
+
+  void _addItem() {
+    final name = _itemNameCtrl.text.trim();
+    final amount = double.tryParse(_itemAmountCtrl.text.trim().replaceAll(',', '.'));
+    if (name.isEmpty || amount == null || amount <= 0) return;
+    setState(() {
+      _costItems.add({'name': name, 'amount': amount});
+      _itemNameCtrl.clear();
+      _itemAmountCtrl.clear();
+    });
+  }
+
+  bool get _isOverBudget {
+    final agreed = double.tryParse(widget.agreedPrice?.toString() ?? '');
+    if (agreed == null || _total == 0) return false;
+    return _total > agreed;
+  }
+
+  bool get _isValid {
+    if (_descCtrl.text.trim().isEmpty) return false;
+    if (_isOverBudget && _overBudgetCtrl.text.trim().isEmpty) return false;
+    return true;
+  }
+
+  Future<void> _submit() async {
+    if (!_isValid) return;
+    setState(() => _submitting = true);
+    final ok = await widget.notifier.postUpdate({
+      'updateType': _updateType,
+      'description': _descCtrl.text.trim(),
+      if (_partsCtrl.text.trim().isNotEmpty) 'partsUsed': _partsCtrl.text.trim(),
+      if (_costItems.isNotEmpty) 'costItems': _costItems,
+      if (_kdvRate > 0) 'kdvRate': _kdvRate,
+      if (_kdvAmount > 0) 'kdvAmount': _kdvAmount,
+      if (_overBudgetCtrl.text.trim().isNotEmpty) 'overBudgetReason': _overBudgetCtrl.text.trim(),
+    });
+    if (mounted) {
+      setState(() => _submitting = false);
+      if (ok) {
+        Navigator.of(context).pop();
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Güncelleme eklendi'), backgroundColor: Color(0xFF16A34A)),
+        );
+      }
+    }
+  }
+
+  @override
+  void dispose() {
+    _descCtrl.dispose();
+    _partsCtrl.dispose();
+    _overBudgetCtrl.dispose();
+    _itemNameCtrl.dispose();
+    _itemAmountCtrl.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final bottom = MediaQuery.of(context).viewInsets.bottom;
+    final screenHeight = MediaQuery.of(context).size.height;
+
+    return Container(
+      constraints: BoxConstraints(maxHeight: screenHeight * 0.92),
+      decoration: const BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(20, 20, 20, 0),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Center(
+                  child: Container(
+                    width: 36, height: 4,
+                    decoration: BoxDecoration(color: AppColors.gray200, borderRadius: BorderRadius.circular(99)),
+                  ),
+                ),
+                const SizedBox(height: 20),
+                const Text('Güncelleme Ekle', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700, color: AppColors.gray900)),
+                const SizedBox(height: 20),
+              ],
+            ),
+          ),
+          Flexible(
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.symmetric(horizontal: 20),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Wrap(
+                    spacing: 8, runSpacing: 6,
+                    children: _updateTypes.map(((String, String) t) {
+                      final active = _updateType == t.$1;
+                      return GestureDetector(
+                        onTap: () => setState(() => _updateType = t.$1),
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                          decoration: BoxDecoration(
+                            color: active ? AppColors.blue600 : Colors.white,
+                            borderRadius: BorderRadius.circular(20),
+                            border: Border.all(color: active ? AppColors.blue600 : AppColors.gray300),
+                          ),
+                          child: Text(t.$2, style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: active ? Colors.white : AppColors.gray600)),
+                        ),
+                      );
+                    }).toList(),
+                  ),
+                  const SizedBox(height: 14),
+                  const Text('Açıklama *', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: AppColors.gray700)),
+                  const SizedBox(height: 6),
+                  TextField(
+                    controller: _descCtrl,
+                    maxLines: 3,
+                    onChanged: (_) => setState(() {}),
+                    decoration: _inputDec('Güncelleme açıklaması...'),
+                  ),
+                  const SizedBox(height: 12),
+                  const Text('Kullanılan Parçalar', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: AppColors.gray700)),
+                  const SizedBox(height: 6),
+                  TextField(controller: _partsCtrl, decoration: _inputDec('Opsiyonel...')),
+                  const SizedBox(height: 16),
+                  _CostItemsSection(
+                    costItems: _costItems,
+                    kdvRate: _kdvRate,
+                    kdvOptions: _kdvOptions,
+                    subtotal: _subtotal,
+                    kdvAmount: _kdvAmount,
+                    total: _total,
+                    itemNameCtrl: _itemNameCtrl,
+                    itemAmountCtrl: _itemAmountCtrl,
+                    onAdd: _addItem,
+                    onRemove: (i) => setState(() => _costItems.removeAt(i)),
+                    onKdvChanged: (r) => setState(() => _kdvRate = r),
+                    onItemChanged: () => setState(() {}),
+                  ),
+                  if (_isOverBudget) ...[
+                    const SizedBox(height: 12),
+                    Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFFFF7ED),
+                        borderRadius: BorderRadius.circular(10),
+                        border: Border.all(color: const Color(0xFFFDBA74)),
+                      ),
+                      child: const Row(
+                        children: [
+                          Icon(Icons.warning_amber_outlined, size: 16, color: Color(0xFFEA580C)),
+                          SizedBox(width: 8),
+                          Expanded(
+                            child: Text(
+                              'Toplam tutar kabul edilen teklifin üzerinde. Aşım sebebini belirtin.',
+                              style: TextStyle(fontSize: 12, color: Color(0xFFEA580C)),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    TextField(
+                      controller: _overBudgetCtrl,
+                      maxLines: 2,
+                      onChanged: (_) => setState(() {}),
+                      decoration: _inputDec('Bütçe aşım sebebi *'),
+                    ),
+                  ],
+                  const SizedBox(height: 8),
+                ],
+              ),
+            ),
+          ),
+          Padding(
+            padding: EdgeInsets.fromLTRB(20, 12, 20, 20 + bottom),
+            child: Row(
+              children: [
+                Expanded(
+                  child: OutlinedButton(
+                    onPressed: _submitting ? null : () => Navigator.of(context).pop(),
+                    style: OutlinedButton.styleFrom(
+                      side: const BorderSide(color: AppColors.gray300),
+                      foregroundColor: AppColors.gray600,
+                      padding: const EdgeInsets.symmetric(vertical: 14),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    ),
+                    child: const Text('İptal'),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  flex: 2,
+                  child: ElevatedButton(
+                    onPressed: _submitting || !_isValid ? null : _submit,
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppColors.blue600,
+                      foregroundColor: Colors.white,
+                      disabledBackgroundColor: AppColors.gray200,
+                      padding: const EdgeInsets.symmetric(vertical: 14),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    ),
+                    child: _submitting
+                        ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                        : const Text('Gönder', style: TextStyle(fontWeight: FontWeight.w600)),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  InputDecoration _inputDec(String hint) => InputDecoration(
+    hintText: hint,
+    hintStyle: const TextStyle(fontSize: 13, color: AppColors.gray400),
+    border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: AppColors.gray200)),
+    focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: AppColors.blue600, width: 1.5)),
+    contentPadding: const EdgeInsets.all(12),
+  );
+}
+
+// ─── Complete job bottom sheet ────────────────────────────────────────────────
+
+class _CompleteJobSheet extends StatefulWidget {
+  final ProviderRequestDetailNotifier notifier;
+  final dynamic acceptedPrice;
+  final double initialKdvRate;
+  const _CompleteJobSheet({required this.notifier, this.acceptedPrice, this.initialKdvRate = 20.0});
+
+  @override
+  State<_CompleteJobSheet> createState() => _CompleteJobSheetState();
+}
+
+class _CompleteJobSheetState extends State<_CompleteJobSheet> {
+  final _workDoneCtrl = TextEditingController();
+  final _partsCtrl = TextEditingController();
+  final _overBudgetCtrl = TextEditingController();
+  final List<Map<String, dynamic>> _costItems = [];
+  late double _kdvRate = widget.initialKdvRate;
+  final _itemNameCtrl = TextEditingController();
+  final _itemAmountCtrl = TextEditingController();
+  bool _submitting = false;
+
+  static const _kdvOptions = [0.0, 10.0, 20.0];
+
+  double get _subtotal => _costItems.fold(0, (s, e) => s + ((e['amount'] as num?)?.toDouble() ?? 0));
+  double get _kdvAmount => _subtotal * _kdvRate / 100;
+  double get _total => _subtotal + _kdvAmount;
+
+  bool get _isOverBudget {
+    final accepted = double.tryParse(widget.acceptedPrice?.toString() ?? '');
+    if (accepted == null || _total == 0) return false;
+    return _total > accepted;
+  }
+
+  bool get _isValid {
+    if (_workDoneCtrl.text.trim().isEmpty) return false;
+    if (_isOverBudget && _overBudgetCtrl.text.trim().isEmpty) return false;
+    return true;
+  }
+
+  void _addItem() {
+    final name = _itemNameCtrl.text.trim();
+    final amount = double.tryParse(_itemAmountCtrl.text.trim().replaceAll(',', '.'));
+    if (name.isEmpty || amount == null || amount <= 0) return;
+    setState(() {
+      _costItems.add({'name': name, 'amount': amount});
+      _itemNameCtrl.clear();
+      _itemAmountCtrl.clear();
+    });
+  }
+
+  Future<void> _submit() async {
+    if (!_isValid) return;
+    setState(() => _submitting = true);
+    final ok = await widget.notifier.completeJob(
+      workDone: _workDoneCtrl.text.trim(),
+      partsUsed: _partsCtrl.text.trim().isNotEmpty ? _partsCtrl.text.trim() : null,
+      costItems: _costItems,
+      kdvRate: _kdvRate > 0 ? _kdvRate : null,
+      kdvAmount: _kdvAmount > 0 ? _kdvAmount : null,
+      overBudgetReason: _overBudgetCtrl.text.trim().isNotEmpty ? _overBudgetCtrl.text.trim() : null,
+    );
+    if (mounted) {
+      setState(() => _submitting = false);
+      if (ok) {
+        Navigator.of(context).pop();
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('İş başarıyla tamamlandı'), backgroundColor: Color(0xFF16A34A)),
+        );
+      }
+    }
+  }
+
+  @override
+  void dispose() {
+    _workDoneCtrl.dispose();
+    _partsCtrl.dispose();
+    _overBudgetCtrl.dispose();
+    _itemNameCtrl.dispose();
+    _itemAmountCtrl.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final bottom = MediaQuery.of(context).viewInsets.bottom;
+    final screenHeight = MediaQuery.of(context).size.height;
+
+    return Container(
+      constraints: BoxConstraints(maxHeight: screenHeight * 0.92),
+      decoration: const BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(20, 20, 20, 0),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Center(
+                  child: Container(
+                    width: 36, height: 4,
+                    decoration: BoxDecoration(color: AppColors.gray200, borderRadius: BorderRadius.circular(99)),
+                  ),
+                ),
+                const SizedBox(height: 20),
+                const Text('İşi Tamamla', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700, color: AppColors.gray900)),
+                const SizedBox(height: 20),
+              ],
+            ),
+          ),
+          Flexible(
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.symmetric(horizontal: 20),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text('Yapılan İşler *', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: AppColors.gray700)),
+                  const SizedBox(height: 6),
+                  TextField(
+                    controller: _workDoneCtrl,
+                    maxLines: 3,
+                    onChanged: (_) => setState(() {}),
+                    decoration: _inputDec('Yapılan işlemleri detaylıca açıklayın...'),
+                  ),
+                  const SizedBox(height: 12),
+                  const Text('Kullanılan Parçalar', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: AppColors.gray700)),
+                  const SizedBox(height: 6),
+                  TextField(controller: _partsCtrl, decoration: _inputDec('Opsiyonel...')),
+                  const SizedBox(height: 16),
+                  _CostItemsSection(
+                    costItems: _costItems,
+                    kdvRate: _kdvRate,
+                    kdvOptions: _kdvOptions,
+                    subtotal: _subtotal,
+                    kdvAmount: _kdvAmount,
+                    total: _total,
+                    itemNameCtrl: _itemNameCtrl,
+                    itemAmountCtrl: _itemAmountCtrl,
+                    onAdd: _addItem,
+                    onRemove: (i) => setState(() => _costItems.removeAt(i)),
+                    onKdvChanged: (r) => setState(() => _kdvRate = r),
+                    onItemChanged: () => setState(() {}),
+                  ),
+                  if (_isOverBudget) ...[
+                    const SizedBox(height: 12),
+                    Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFFFF7ED),
+                        borderRadius: BorderRadius.circular(10),
+                        border: Border.all(color: const Color(0xFFFDBA74)),
+                      ),
+                      child: const Row(
+                        children: [
+                          Icon(Icons.warning_amber_outlined, size: 16, color: Color(0xFFEA580C)),
+                          SizedBox(width: 8),
+                          Expanded(
+                            child: Text(
+                              'Toplam tutar kabul edilen teklifin üzerinde. Aşım sebebini belirtin.',
+                              style: TextStyle(fontSize: 12, color: Color(0xFFEA580C)),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    TextField(
+                      controller: _overBudgetCtrl,
+                      maxLines: 2,
+                      onChanged: (_) => setState(() {}),
+                      decoration: _inputDec('Bütçe aşım sebebi *'),
+                    ),
+                  ],
+                  const SizedBox(height: 8),
+                ],
+              ),
+            ),
+          ),
+          Padding(
+            padding: EdgeInsets.fromLTRB(20, 12, 20, 20 + bottom),
+            child: Row(
+              children: [
+                Expanded(
+                  child: OutlinedButton(
+                    onPressed: _submitting ? null : () => Navigator.of(context).pop(),
+                    style: OutlinedButton.styleFrom(
+                      side: const BorderSide(color: AppColors.gray300),
+                      foregroundColor: AppColors.gray600,
+                      padding: const EdgeInsets.symmetric(vertical: 14),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    ),
+                    child: const Text('İptal'),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  flex: 2,
+                  child: ElevatedButton(
+                    onPressed: _submitting || !_isValid ? null : _submit,
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFF16A34A),
+                      foregroundColor: Colors.white,
+                      disabledBackgroundColor: AppColors.gray200,
+                      padding: const EdgeInsets.symmetric(vertical: 14),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    ),
+                    child: _submitting
+                        ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                        : const Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(Icons.check_circle_outline_rounded, size: 16),
+                              SizedBox(width: 6),
+                              Text('Tamamla', style: TextStyle(fontWeight: FontWeight.w600)),
+                            ],
+                          ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  InputDecoration _inputDec(String hint) => InputDecoration(
+    hintText: hint,
+    hintStyle: const TextStyle(fontSize: 13, color: AppColors.gray400),
+    border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: AppColors.gray200)),
+    focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: AppColors.blue600, width: 1.5)),
+    contentPadding: const EdgeInsets.all(12),
+  );
+}
+
+// ─── Shared cost items section ────────────────────────────────────────────────
+
+class _CostItemsSection extends StatelessWidget {
+  final List<Map<String, dynamic>> costItems;
+  final double kdvRate;
+  final List<double> kdvOptions;
+  final double subtotal;
+  final double kdvAmount;
+  final double total;
+  final TextEditingController itemNameCtrl;
+  final TextEditingController itemAmountCtrl;
+  final VoidCallback onAdd;
+  final void Function(int) onRemove;
+  final void Function(double) onKdvChanged;
+  final VoidCallback onItemChanged;
+
+  const _CostItemsSection({
+    required this.costItems,
+    required this.kdvRate,
+    required this.kdvOptions,
+    required this.subtotal,
+    required this.kdvAmount,
+    required this.total,
+    required this.itemNameCtrl,
+    required this.itemAmountCtrl,
+    required this.onAdd,
+    required this.onRemove,
+    required this.onKdvChanged,
+    required this.onItemChanged,
+  });
+
+  String _fmt(double val) => val.toStringAsFixed(0).replaceAllMapped(
+    RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'),
+    (m) => '${m[1]}.',
+  );
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text('Maliyet Kalemleri', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: AppColors.gray700)),
+        const SizedBox(height: 8),
+        if (costItems.isNotEmpty) ...[
+          Container(
+            decoration: BoxDecoration(
+              color: AppColors.gray50,
+              borderRadius: BorderRadius.circular(10),
+              border: Border.all(color: AppColors.gray200),
+            ),
+            child: Column(
+              children: List.generate(costItems.length, (i) {
+                final item = costItems[i];
+                final isLast = i == costItems.length - 1;
+                return Column(
+                  children: [
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                      child: Row(
+                        children: [
+                          Expanded(
+                            child: Text(item['name']?.toString() ?? '', style: const TextStyle(fontSize: 13, color: AppColors.gray700)),
+                          ),
+                          Text(
+                            '${_fmt((item['amount'] as num?)?.toDouble() ?? 0)} ₺',
+                            style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: AppColors.gray900),
+                          ),
+                          const SizedBox(width: 8),
+                          GestureDetector(
+                            onTap: () => onRemove(i),
+                            child: const Icon(Icons.close, size: 16, color: AppColors.gray400),
+                          ),
+                        ],
+                      ),
+                    ),
+                    if (!isLast) const Divider(height: 1, color: AppColors.gray200),
+                  ],
+                );
+              }),
+            ),
+          ),
+          const SizedBox(height: 8),
+        ],
+        Row(
+          children: [
+            Expanded(
+              flex: 2,
+              child: TextField(
+                controller: itemNameCtrl,
+                onChanged: (_) => onItemChanged(),
+                decoration: InputDecoration(
+                  hintText: 'Kalem adı',
+                  hintStyle: const TextStyle(fontSize: 12, color: AppColors.gray400),
+                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: const BorderSide(color: AppColors.gray200)),
+                  focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: const BorderSide(color: AppColors.blue600)),
+                  contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
+                ),
+              ),
+            ),
+            const SizedBox(width: 8),
+            Expanded(
+              child: TextField(
+                controller: itemAmountCtrl,
+                keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                onChanged: (_) => onItemChanged(),
+                decoration: InputDecoration(
+                  hintText: 'Tutar',
+                  hintStyle: const TextStyle(fontSize: 12, color: AppColors.gray400),
+                  suffixText: '₺',
+                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: const BorderSide(color: AppColors.gray200)),
+                  focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: const BorderSide(color: AppColors.blue600)),
+                  contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
+                ),
+              ),
+            ),
+            const SizedBox(width: 8),
+            GestureDetector(
+              onTap: onAdd,
+              child: Container(
+                width: 40,
+                height: 40,
+                decoration: BoxDecoration(
+                  color: AppColors.blue600,
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: const Icon(Icons.add, color: Colors.white, size: 20),
+              ),
+            ),
+          ],
+        ),
+        if (costItems.isNotEmpty) ...[
+          const SizedBox(height: 14),
+          const Text('KDV Oranı', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: AppColors.gray700)),
+          const SizedBox(height: 8),
+          Wrap(
+            spacing: 8,
+            children: kdvOptions.map((rate) {
+              final active = kdvRate == rate;
+              return GestureDetector(
+                onTap: () => onKdvChanged(rate),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
+                  decoration: BoxDecoration(
+                    color: active ? AppColors.blue600 : Colors.white,
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: active ? AppColors.blue600 : AppColors.gray300),
+                  ),
+                  child: Text(
+                    '%${rate.toInt()}',
+                    style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: active ? Colors.white : AppColors.gray600),
+                  ),
+                ),
+              );
+            }).toList(),
+          ),
+          const SizedBox(height: 12),
+          Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: const Color(0xFFF0FDF4),
+              borderRadius: BorderRadius.circular(10),
+              border: Border.all(color: const Color(0xFF6EE7B7)),
+            ),
+            child: Column(
+              children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    const Text('Ara Toplam', style: TextStyle(fontSize: 12, color: AppColors.gray500)),
+                    Text('${_fmt(subtotal)} ₺', style: const TextStyle(fontSize: 12, color: AppColors.gray700)),
+                  ],
+                ),
+                if (kdvAmount > 0) ...[
+                  const SizedBox(height: 4),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text('KDV (%${kdvRate.toInt()})', style: const TextStyle(fontSize: 12, color: AppColors.gray500)),
+                      Text('${_fmt(kdvAmount)} ₺', style: const TextStyle(fontSize: 12, color: AppColors.gray700)),
+                    ],
+                  ),
+                ],
+                const Divider(height: 12, color: Color(0xFF6EE7B7)),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    const Text('Toplam', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: Color(0xFF15803D))),
+                    Text('${_fmt(total)} ₺', style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w800, color: Color(0xFF15803D))),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        ],
+      ],
     );
   }
 }

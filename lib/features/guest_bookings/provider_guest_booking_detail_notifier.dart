@@ -126,9 +126,10 @@ class ProviderGuestBookingDetailNotifier extends StateNotifier<ProviderGuestBook
     String? partsUsed,
     String? delayReason,
     int? delayEstimateDays,
-    double? laborCost,
-    double? partsCost,
-    double? totalCost,
+    List<Map<String, dynamic>> costItems = const [],
+    double? kdvRate,
+    double? kdvAmount,
+    String? overBudgetReason,
   }) async {
     state = state.copyWith(postingUpdate: true, actionError: null);
     try {
@@ -138,9 +139,10 @@ class ProviderGuestBookingDetailNotifier extends StateNotifier<ProviderGuestBook
         if (partsUsed != null && partsUsed.isNotEmpty) 'partsUsed': partsUsed,
         if (delayReason != null && delayReason.isNotEmpty) 'delayReason': delayReason,
         if (delayEstimateDays != null) 'delayEstimateDays': delayEstimateDays,
-        if (laborCost != null) 'laborCost': laborCost,
-        if (partsCost != null) 'partsCost': partsCost,
-        if (totalCost != null) 'totalCost': totalCost,
+        if (costItems.isNotEmpty) 'costItems': costItems,
+        if (kdvRate != null) 'kdvRate': kdvRate,
+        if (kdvAmount != null) 'kdvAmount': kdvAmount,
+        if (overBudgetReason != null && overBudgetReason.isNotEmpty) 'overBudgetReason': overBudgetReason,
       };
       await _api.post('/api/provider/guest-bookings/$_id/updates', data: body);
       await loadDetail();

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/theme/theme.dart';
+import '../../../shared/widgets/shared_pagination.dart';
 import '../../../shared/widgets/skeleton.dart';
 import 'provider_reviews_notifier.dart';
 
@@ -22,24 +23,41 @@ class ProviderReviewsScreen extends ConsumerWidget {
           if (!state.loading)
             IconButton(
               icon: const Icon(Icons.refresh_outlined, color: AppColors.gray600),
-              onPressed: notifier.fetchReviews,
+              onPressed: () => notifier.fetchReviews(page: 1),
             ),
         ],
       ),
-      body: RefreshIndicator(
-        color: AppColors.blue600,
-        onRefresh: notifier.fetchReviews,
-        child: _buildBody(context, state, notifier),
+      body: SafeArea(
+        bottom: false,
+        child: Column(
+          children: [
+            Expanded(
+              child: RefreshIndicator(
+                color: AppColors.blue600,
+                onRefresh: () => notifier.fetchReviews(page: 1),
+                child: _buildBody(context, state, notifier),
+              ),
+            ),
+            if (state.totalPages > 1)
+              SharedPagination(
+                currentPage: state.currentPage,
+                totalPages: state.totalPages,
+                total: state.totalReviews,
+                onPrevious: state.currentPage > 1 ? notifier.previousPage : null,
+                onNext: state.currentPage < state.totalPages ? notifier.nextPage : null,
+              ),
+          ],
+        ),
       ),
     );
   }
 
   Widget _buildBody(BuildContext context, ProviderReviewsState state, ProviderReviewsNotifier notifier) {
-    if (state.loading) {
+    if (state.loading && state.reviews.isEmpty) {
       return const _ReviewsSkeleton();
     }
 
-    if (state.error != null) {
+    if (state.error != null && state.reviews.isEmpty) {
       return Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
@@ -77,17 +95,32 @@ class ProviderReviewsScreen extends ConsumerWidget {
       );
     }
 
-    return ListView(
-      padding: const EdgeInsets.all(16),
+    return Stack(
       children: [
-        _RatingSummaryCard(state: state),
-        const SizedBox(height: 20),
-        ...state.reviews.map((r) => _ReviewCard(
-              review: r,
-              isReplying: state.replyingId == r.id,
-              onReply: (reply) => notifier.submitReply(r.id, reply),
-            )),
-        const SizedBox(height: 16),
+        ListView(
+          padding: const EdgeInsets.all(16),
+          children: [
+            _RatingSummaryCard(state: state),
+            const SizedBox(height: 20),
+            ...state.reviews.map((r) => _ReviewCard(
+                  review: r,
+                  isReplying: state.replyingId == r.id,
+                  onReply: (reply) => notifier.submitReply(r.id, reply),
+                )),
+            const SizedBox(height: 16),
+          ],
+        ),
+        if (state.loading)
+          const Positioned(
+            top: 0,
+            left: 0,
+            right: 0,
+            child: LinearProgressIndicator(
+              color: AppColors.blue600,
+              backgroundColor: AppColors.gray100,
+              minHeight: 2,
+            ),
+          ),
       ],
     );
   }

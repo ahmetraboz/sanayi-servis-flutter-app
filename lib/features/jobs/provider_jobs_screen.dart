@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 import '../../../core/theme/theme.dart';
 import '../../../shared/widgets/date_picker_sheet.dart';
 import '../../../shared/widgets/page_header.dart';
+import '../../../shared/widgets/shared_pagination.dart';
 import '../../../shared/widgets/skeleton.dart';
 import 'provider_jobs_notifier.dart';
 
@@ -29,6 +30,14 @@ class ProviderJobsScreen extends ConsumerWidget {
                 child: _buildBody(context, state),
               ),
             ),
+            if (state.totalPages > 1)
+              SharedPagination(
+                currentPage: state.currentPage,
+                totalPages: state.totalPages,
+                total: state.total,
+                onPrevious: state.currentPage > 1 ? notifier.previousPage : null,
+                onNext: state.currentPage < state.totalPages ? notifier.nextPage : null,
+              ),
           ],
         ),
       ),
@@ -36,11 +45,11 @@ class ProviderJobsScreen extends ConsumerWidget {
   }
 
   Widget _buildBody(BuildContext context, ProviderJobsState state) {
-    if (state.loading) {
+    if (state.loading && state.jobs.isEmpty) {
       return const _JobListSkeleton();
     }
 
-    if (state.error != null) {
+    if (state.error != null && state.jobs.isEmpty) {
       return ListView(
         physics: const AlwaysScrollableScrollPhysics(),
         children: [
@@ -110,39 +119,54 @@ class ProviderJobsScreen extends ConsumerWidget {
       );
     }
 
-    return ListView(
-      padding: const EdgeInsets.all(16),
+    return Stack(
       children: [
-        if (state.activeJobs.isNotEmpty) ...[
-          _SectionHeader(
-            dot: const _PulseDot(color: AppColors.blue600),
-            label: 'Aktif İşler',
-            count: state.activeJobs.length,
+        ListView(
+          padding: const EdgeInsets.all(16),
+          children: [
+            if (state.activeJobs.isNotEmpty) ...[
+              _SectionHeader(
+                dot: const _PulseDot(color: AppColors.blue600),
+                label: 'Aktif İşler',
+                count: state.activeJobs.length,
+              ),
+              const SizedBox(height: 10),
+              ...state.activeJobs.map((job) => _ActiveJobCard(job: job)),
+              const SizedBox(height: 20),
+            ],
+            if (state.pendingReviewJobs.isNotEmpty) ...[
+              _SectionHeader(
+                dot: const _PulseDot(color: AppColors.yellow400),
+                label: 'Değerlendirme Bekliyor',
+                count: state.pendingReviewJobs.length,
+              ),
+              const SizedBox(height: 10),
+              ...state.pendingReviewJobs.map((job) => _PendingReviewCard(job: job)),
+              const SizedBox(height: 20),
+            ],
+            if (state.completedJobs.isNotEmpty) ...[
+              _SectionHeader(
+                dot: const Icon(Icons.check_circle_outline, size: 14, color: AppColors.primary600),
+                label: 'Tamamlanan İşler',
+                count: state.completedJobs.length,
+              ),
+              const SizedBox(height: 10),
+              ...state.completedJobs.map((job) => _CompletedJobCard(job: job)),
+            ],
+            const SizedBox(height: 16),
+          ],
+        ),
+        if (state.loading)
+          const Positioned(
+            top: 0,
+            left: 0,
+            right: 0,
+            child: LinearProgressIndicator(
+              color: AppColors.blue600,
+              backgroundColor: AppColors.gray100,
+              minHeight: 2,
+            ),
           ),
-          const SizedBox(height: 10),
-          ...state.activeJobs.map((job) => _ActiveJobCard(job: job)),
-          const SizedBox(height: 20),
-        ],
-        if (state.pendingReviewJobs.isNotEmpty) ...[
-          _SectionHeader(
-            dot: const _PulseDot(color: AppColors.yellow400),
-            label: 'Değerlendirme Bekliyor',
-            count: state.pendingReviewJobs.length,
-          ),
-          const SizedBox(height: 10),
-          ...state.pendingReviewJobs.map((job) => _PendingReviewCard(job: job)),
-          const SizedBox(height: 20),
-        ],
-        if (state.completedJobs.isNotEmpty) ...[
-          _SectionHeader(
-            dot: const Icon(Icons.check_circle_outline, size: 14, color: AppColors.primary600),
-            label: 'Tamamlanan İşler',
-            count: state.completedJobs.length,
-          ),
-          const SizedBox(height: 10),
-          ...state.completedJobs.map((job) => _CompletedJobCard(job: job)),
-        ],
-        const SizedBox(height: 16),
       ],
     );
   }

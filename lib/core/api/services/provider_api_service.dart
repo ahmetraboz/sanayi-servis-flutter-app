@@ -58,4 +58,14 @@ class ProviderApiService {
     final data = response.data as List;
     return data.map((json) => RequestModel.fromJson(json as Map<String, dynamic>)).toList();
   }
+
+  Future<double> getKdvRate() async {
+    final response = await _client.get('/api/public/kdv');
+    final data = response.data as Map<String, dynamic>;
+    return (data['kdvRate'] as num?)?.toDouble() ?? 20.0;
+  }
 }
+
+final kdvRateProvider = FutureProvider<double>((ref) async {
+  return ref.watch(providerApiProvider).getKdvRate();
+});

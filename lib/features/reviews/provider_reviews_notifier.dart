@@ -60,6 +60,8 @@ class ProviderReviewsState {
   final int totalReviews;
   final int? replyingId;
   final String? replyError;
+  final int currentPage;
+  final int totalPages;
 
   const ProviderReviewsState({
     this.loading = true,
@@ -69,6 +71,8 @@ class ProviderReviewsState {
     this.totalReviews = 0,
     this.replyingId,
     this.replyError,
+    this.currentPage = 1,
+    this.totalPages = 1,
   });
 
   Map<int, int> get starBuckets {
@@ -88,6 +92,8 @@ class ProviderReviewsState {
     int? totalReviews,
     Object? replyingId = _sentinel,
     Object? replyError = _sentinel,
+    int? currentPage,
+    int? totalPages,
   }) {
     return ProviderReviewsState(
       loading: loading ?? this.loading,
@@ -97,6 +103,8 @@ class ProviderReviewsState {
       totalReviews: totalReviews ?? this.totalReviews,
       replyingId: identical(replyingId, _sentinel) ? this.replyingId : replyingId as int?,
       replyError: identical(replyError, _sentinel) ? this.replyError : replyError as String?,
+      currentPage: currentPage ?? this.currentPage,
+      totalPages: totalPages ?? this.totalPages,
     );
   }
 }
@@ -108,23 +116,41 @@ class ProviderReviewsNotifier extends StateNotifier<ProviderReviewsState> {
     fetchReviews();
   }
 
-  Future<void> fetchReviews() async {
+  Future<void> fetchReviews({int page = 1}) async {
+    if (!mounted) return;
     state = state.copyWith(loading: true, error: null);
     try {
-      final res = await _api.get('/api/provider/reviews');
+      final res = await _api.get('/api/provider/reviews', queryParameters: {'page': '$page', 'limit': '10'});
       final data = res.data as Map<String, dynamic>;
-      final list = (data['reviews'] as List? ?? [])
+      final list = (data['data'] as List? ?? [])
           .map((e) => ReviewItem.fromJson(e as Map<String, dynamic>))
           .toList();
+      final pagination = data['pagination'] as Map<String, dynamic>? ?? {};
       final avg = data['averageRating'];
+      if (!mounted) return;
       state = state.copyWith(
         loading: false,
         reviews: list,
         averageRating: avg != null ? (avg as num).toDouble() : null,
-        totalReviews: data['totalReviews'] as int? ?? list.length,
+        totalReviews: data['totalReviews'] as int? ?? pagination['total'] as int? ?? list.length,
+        currentPage: pagination['page'] as int? ?? 1,
+        totalPages: pagination['totalPages'] as int? ?? 1,
       );
     } on DioException catch (e) {
+      if (!mounted) return;
       state = state.copyWith(loading: false, error: e.message ?? 'Değerlendirmeler yüklenemedi');
+    }
+  }
+
+  void nextPage() {
+    if (state.currentPage < state.totalPages) {
+      fetchReviews(page: state.currentPage + 1);
+    }
+  }
+
+  void previousPage() {
+    if (state.currentPage > 1) {
+      fetchReviews(page: state.currentPage - 1);
     }
   }
 

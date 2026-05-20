@@ -7,6 +7,7 @@ const _kStatusMap = <String, _StatusConfig>{
   'open': (bg: AppColors.info50, text: AppColors.blue700, label: 'Açık'),
   'bidding': (bg: AppColors.violet50, text: AppColors.violet700, label: 'Teklif Bekleniyor'),
   'info_requested': (bg: AppColors.amber50, text: AppColors.amber700, label: 'Bilgi Bekleniyor'),
+  'info_provided': (bg: AppColors.success50, text: AppColors.primary700, label: 'Bilgi Verildi'),
   'accepted': (bg: AppColors.success50, text: AppColors.primary700, label: 'Onaylandı'),
   'in_progress': (bg: AppColors.info50, text: AppColors.blue700, label: 'Devam Ediyor'),
   'pending_review': (bg: AppColors.amber50, text: AppColors.amber700, label: 'Değerlendirme'),

@@ -212,18 +212,20 @@ class ProviderRequestDetailNotifier extends StateNotifier<ProviderRequestDetailS
   Future<bool> completeJob({
     required String workDone,
     String? partsUsed,
-    num? laborCost,
-    num? partsCost,
-    num? totalCost,
+    List<Map<String, dynamic>> costItems = const [],
+    double? kdvRate,
+    double? kdvAmount,
+    String? overBudgetReason,
   }) async {
     state = state.copyWith(completing: true, actionError: null);
     try {
       await _api.post('/api/provider/requests/$requestId/complete', data: {
         'workDone': workDone,
         if (partsUsed != null && partsUsed.isNotEmpty) 'partsUsed': partsUsed,
-        if (laborCost != null) 'laborCost': laborCost,
-        if (partsCost != null) 'partsCost': partsCost,
-        if (totalCost != null) 'totalCost': totalCost,
+        if (costItems.isNotEmpty) 'costItems': costItems,
+        if (kdvRate != null) 'kdvRate': kdvRate,
+        if (kdvAmount != null) 'kdvAmount': kdvAmount,
+        if (overBudgetReason != null && overBudgetReason.isNotEmpty) 'overBudgetReason': overBudgetReason,
       });
       state = state.copyWith(completing: false);
       await loadDetail();

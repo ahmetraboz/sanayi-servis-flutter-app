@@ -61,16 +61,18 @@ class ProviderOpenRequestsNotifier extends StateNotifier<ProviderOpenRequestsSta
   }
 
   Future<void> fetchRequests({int page = 1}) async {
+    if (!mounted) return;
     state = state.copyWith(loading: true, error: null);
     try {
       final response = await _apiClient.get(
         '/api/provider/open-requests',
         queryParameters: {'page': '1', 'limit': '200'},
       );
-
+      if (!mounted) return;
       final all = response.data['data'] as List<dynamic>? ?? [];
       _applyFilter(all: all, category: state.activeCategory, urgency: state.activeUrgency, page: page);
     } catch (e) {
+      if (!mounted) return;
       state = state.copyWith(
         loading: false,
         error: 'Talepler yüklenirken bir hata oluştu.',
@@ -141,6 +143,6 @@ class ProviderOpenRequestsNotifier extends StateNotifier<ProviderOpenRequestsSta
 }
 
 final providerOpenRequestsProvider =
-    StateNotifierProvider<ProviderOpenRequestsNotifier, ProviderOpenRequestsState>((ref) {
+    StateNotifierProvider.autoDispose<ProviderOpenRequestsNotifier, ProviderOpenRequestsState>((ref) {
   return ProviderOpenRequestsNotifier(ref.watch(apiClientProvider));
 });

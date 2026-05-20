@@ -36,7 +36,7 @@ class ProviderRequestsScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final state = ref.watch(providerOpenRequestsProvider);
-    final notifier = ref.read(providerOpenRequestsProvider.notifier);
+    final notifier = ref.watch(providerOpenRequestsProvider.notifier);
 
     return Scaffold(
       backgroundColor: AppColors.gray50,

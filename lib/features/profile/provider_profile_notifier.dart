@@ -95,6 +95,20 @@ class ProviderProfileNotifier extends StateNotifier<ProviderProfileState> {
     }
   }
 
+  Future<String?> changePassword(String currentPassword, String newPassword) async {
+    try {
+      await _api.put('/api/profile/password', data: {
+        'currentPassword': currentPassword,
+        'newPassword': newPassword,
+      });
+      return null;
+    } on DioException catch (e) {
+      final data = e.response?.data;
+      final msg = data is Map<String, dynamic> ? data['statusMessage'] as String? : null;
+      return msg ?? e.message ?? 'Şifre değiştirilemedi';
+    }
+  }
+
   Future<String?> uploadPhoto(File file) async {
     state = state.copyWith(uploadingPhoto: true);
     try {

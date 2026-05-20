@@ -35,6 +35,19 @@ class _ProviderProfileScreenState extends ConsumerState<ProviderProfileScreen> {
     );
   }
 
+  void _openPasswordSheet(BuildContext context) {
+    showModalBottomSheet(
+      useRootNavigator: true,
+      context: context,
+      isScrollControlled: true,
+      useSafeArea: true,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) => _PasswordChangeSheet(
+        onSave: (current, newPwd) => ref.read(providerProfileProvider.notifier).changePassword(current, newPwd),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final state = ref.watch(providerProfileProvider);
@@ -129,6 +142,14 @@ class _ProviderProfileScreenState extends ConsumerState<ProviderProfileScreen> {
                   ? '${state.profile!['averageRating']} ★'
                   : 'Müşteri değerlendirmeleri',
               onTap: () => context.push('/provider/reviews'),
+            ),
+            const SizedBox(height: 10),
+            _NavRow(
+              icon: Icons.lock_outline,
+              label: 'Şifre Değiştir',
+              color: AppColors.gray600,
+              subtitle: 'Hesap şifrenizi güncelleyin',
+              onTap: () => _openPasswordSheet(context),
             ),
 
             const SizedBox(height: 16),
@@ -1679,3 +1700,220 @@ class _NavRow extends StatelessWidget {
     );
   }
 }
+
+// ─── Password Change Sheet ───────────────────────────────────────────────────
+
+class _PasswordChangeSheet extends StatefulWidget {
+  final Future<String?> Function(String current, String newPwd) onSave;
+
+  const _PasswordChangeSheet({required this.onSave});
+
+  @override
+  State<_PasswordChangeSheet> createState() => _PasswordChangeSheetState();
+}
+
+class _PasswordChangeSheetState extends State<_PasswordChangeSheet> {
+  final _currentCtrl = TextEditingController();
+  final _newCtrl = TextEditingController();
+  final _confirmCtrl = TextEditingController();
+
+  bool _obscureCurrent = true;
+  bool _obscureNew = true;
+  bool _obscureConfirm = true;
+
+  bool _submitting = false;
+  String? _error;
+
+  @override
+  void dispose() {
+    _currentCtrl.dispose();
+    _newCtrl.dispose();
+    _confirmCtrl.dispose();
+    super.dispose();
+  }
+
+  Future<void> _submit() async {
+    final current = _currentCtrl.text;
+    final newPwd = _newCtrl.text;
+    final confirm = _confirmCtrl.text;
+
+    if (current.isEmpty || newPwd.isEmpty || confirm.isEmpty) {
+      setState(() => _error = 'Lütfen tüm alanları doldurun');
+      return;
+    }
+
+    if (newPwd.length < 6) {
+      setState(() => _error = 'Yeni şifre en az 6 karakter olmalıdır');
+      return;
+    }
+
+    if (newPwd != confirm) {
+      setState(() => _error = 'Yeni şifreler eşleşmiyor');
+      return;
+    }
+
+    setState(() {
+      _submitting = true;
+      _error = null;
+    });
+
+    final err = await widget.onSave(current, newPwd);
+
+    if (mounted) {
+      setState(() => _submitting = false);
+      if (err != null) {
+        setState(() => _error = err);
+      } else {
+        Navigator.of(context).pop();
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Şifreniz başarıyla güncellendi'),
+            backgroundColor: AppColors.primary600,
+          ),
+        );
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final bottom = MediaQuery.of(context).viewInsets.bottom;
+
+    return Container(
+      decoration: const BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      padding: EdgeInsets.fromLTRB(20, 16, 20, 20 + bottom),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Center(
+            child: Container(
+              width: 36,
+              height: 4,
+              decoration: BoxDecoration(color: AppColors.gray200, borderRadius: BorderRadius.circular(2)),
+            ),
+          ),
+          const SizedBox(height: 16),
+          const Row(
+            children: [
+              Icon(Icons.lock_outline, color: AppColors.blue600),
+              SizedBox(width: 8),
+              Text('Şifre Değiştir', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: AppColors.gray900)),
+            ],
+          ),
+          const SizedBox(height: 16),
+          if (_error != null) ...[
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              decoration: BoxDecoration(
+                color: AppColors.red50,
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: AppColors.red100),
+              ),
+              child: Row(
+                children: [
+                  const Icon(Icons.error_outline, size: 16, color: AppColors.red700),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      _error!,
+                      style: const TextStyle(fontSize: 12, color: AppColors.red700, fontWeight: FontWeight.w500),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 12),
+          ],
+          _buildField(
+            controller: _currentCtrl,
+            label: 'Mevcut Şifre',
+            obscure: _obscureCurrent,
+            onToggle: () => setState(() => _obscureCurrent = !_obscureCurrent),
+          ),
+          const SizedBox(height: 12),
+          _buildField(
+            controller: _newCtrl,
+            label: 'Yeni Şifre (En az 6 karakter)',
+            obscure: _obscureNew,
+            onToggle: () => setState(() => _obscureNew = !_obscureNew),
+          ),
+          const SizedBox(height: 12),
+          _buildField(
+            controller: _confirmCtrl,
+            label: 'Yeni Şifre Tekrar',
+            obscure: _obscureConfirm,
+            onToggle: () => setState(() => _obscureConfirm = !_obscureConfirm),
+          ),
+          const SizedBox(height: 20),
+          Row(
+            children: [
+              Expanded(
+                child: OutlinedButton(
+                  onPressed: _submitting ? null : () => Navigator.of(context).pop(),
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: AppColors.gray600,
+                    side: const BorderSide(color: AppColors.gray200),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                  ),
+                  child: const Text('İptal', style: TextStyle(fontWeight: FontWeight.w600)),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: ElevatedButton(
+                  onPressed: _submitting ? null : _submit,
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppColors.blue600,
+                    foregroundColor: Colors.white,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                  ),
+                  child: _submitting
+                      ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                      : const Text('Şifreyi Güncelle', style: TextStyle(fontWeight: FontWeight.w600)),
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildField({
+    required TextEditingController controller,
+    required String label,
+    required bool obscure,
+    required VoidCallback onToggle,
+  }) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(label, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: AppColors.gray700)),
+        const SizedBox(height: 6),
+        TextField(
+          controller: controller,
+          obscureText: obscure,
+          decoration: InputDecoration(
+            filled: true,
+            fillColor: AppColors.gray50,
+            border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: const BorderSide(color: AppColors.gray200)),
+            enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: const BorderSide(color: AppColors.gray200)),
+            focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: const BorderSide(color: AppColors.blue600)),
+            contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
+            suffixIcon: IconButton(
+              icon: Icon(obscure ? Icons.visibility_off_outlined : Icons.visibility_outlined, size: 18, color: AppColors.gray400),
+              onPressed: onToggle,
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+}
+

@@ -10,9 +10,12 @@ class ReviewApiService {
 
   ReviewApiService(this._client);
 
-  Future<List<dynamic>> getServiceReviews(int serviceId) async {
-    final response = await _client.get('/api/reviews/service/$serviceId');
-    return response.data as List;
+  Future<Map<String, dynamic>> getServiceReviews(int serviceId, {int page = 1, int limit = 10}) async {
+    final response = await _client.get(
+      '/api/reviews/service/$serviceId',
+      queryParameters: {'page': '$page', 'limit': '$limit'},
+    );
+    return response.data as Map<String, dynamic>;
   }
 
   Future<dynamic> createReview(Map<String, dynamic> data) async {
