@@ -36,27 +36,26 @@ class _ProviderShellState extends ConsumerState<ProviderShell> {
       },
     );
 
-    final bottomPad = MediaQuery.of(context).padding.bottom;
-    const double navContentHeight = 75;
 
     return Scaffold(
-      body: Stack(
-        children: [
-          Padding(
-            padding: EdgeInsets.only(bottom: bottomPad + navContentHeight),
-            child: widget.child,
-          ),
-          Positioned(
-            left: 0,
-            right: 0,
-            bottom: 0,
-            child: _FloatingNavBar(
-              selectedIndex: selectedIndex,
-              counts: counts,
-              onTap: (i) => _navigate(context, i),
+      backgroundColor: Colors.transparent,
+      body: Container(
+        color: Colors.white,
+        child: Stack(
+          children: [
+            widget.child,
+            Positioned(
+              left: 0,
+              right: 0,
+              bottom: 0,
+              child: _FloatingNavBar(
+                selectedIndex: selectedIndex,
+                counts: counts,
+                onTap: (i) => _navigate(context, i),
+              ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
@@ -180,8 +179,6 @@ class _FloatingNavBar extends StatelessWidget {
     final bottomPad = MediaQuery.of(context).padding.bottom;
 
     return Container(
-      color: Colors.transparent,
-      child: Container(
         margin: EdgeInsets.fromLTRB(20, 8, 20, bottomPad + 12),
         decoration: BoxDecoration(
           color: Colors.white,
@@ -243,8 +240,7 @@ class _FloatingNavBar extends StatelessWidget {
             ],
           ),
         ),
-      ),
-    );
+      );
   }
 }
 
