@@ -18,6 +18,7 @@ class RequestModel {
   final String? vehicleBodyType;
   final String? vehicleColor;
   final String? vehicleDriveType;
+  final int? vehicleMileage;
   final String? customerName;
   final String? customerPhone;
   final String? userEmail;
@@ -49,6 +50,7 @@ class RequestModel {
     this.vehicleBodyType,
     this.vehicleColor,
     this.vehicleDriveType,
+    this.vehicleMileage,
     this.customerName,
     this.customerPhone,
     this.userEmail,
@@ -81,6 +83,7 @@ class RequestModel {
     vehicleBodyType: json['vehicleBodyType'] as String?,
     vehicleColor: json['vehicleColor'] as String?,
     vehicleDriveType: json['vehicleDriveType'] as String?,
+    vehicleMileage: json['vehicleMileage'] as int?,
     customerName: json['customerName'] as String? ?? json['userName'] as String?,
     customerPhone: json['customerPhone'] as String?,
     userEmail: json['userEmail'] as String?,
@@ -115,6 +118,7 @@ class RequestModel {
     'vehicleBodyType': vehicleBodyType,
     'vehicleColor': vehicleColor,
     'vehicleDriveType': vehicleDriveType,
+    'vehicleMileage': vehicleMileage,
     'customerName': customerName,
     'customerPhone': customerPhone,
     'userEmail': userEmail,

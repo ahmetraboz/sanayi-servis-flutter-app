@@ -814,6 +814,7 @@ class _InfoView extends StatelessWidget {
 // ─── Service Areas Card ───────────────────────────────────────────────────────
 
 const _kServiceAreas = [
+  (key: 'bakim',    label: 'Periyodik Bakım', icon: Icons.construction_outlined),
   (key: 'motor',    label: 'Motor',       icon: Icons.local_fire_department_outlined),
   (key: 'elektrik', label: 'Elektrik',    icon: Icons.bolt_outlined),
   (key: 'fren',     label: 'Frenler',     icon: Icons.do_not_disturb_on_outlined),

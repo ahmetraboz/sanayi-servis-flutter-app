@@ -18,6 +18,7 @@ const _urgencyFilters = <_CategoryFilter>[
 
 const _categoryFilters = <_CategoryFilter>[
   (key: 'all',      label: 'Tüm Kategoriler', icon: Icons.list_alt_outlined,              color: Color(0xFF6B7280)),
+  (key: 'bakim',    label: 'Periyodik Bakım', icon: Icons.construction_outlined,          color: Color(0xFF10B981)),
   (key: 'motor',    label: 'Motor',            icon: Icons.local_fire_department_outlined, color: Color(0xFFDC2626)),
   (key: 'elektrik', label: 'Elektrik',         icon: Icons.bolt_outlined,                 color: Color(0xFFCA8A04)),
   (key: 'fren',     label: 'Fren',             icon: Icons.do_not_disturb_on_outlined,    color: Color(0xFFEA580C)),

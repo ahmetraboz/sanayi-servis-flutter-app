@@ -7,6 +7,7 @@ import '../../../../core/theme/theme.dart';
 typedef _Cat = ({String label, Color bg, Color text, IconData icon});
 
 const _categories = <String, _Cat>{
+  'bakim':    (label: 'Periyodik Bakım', bg: Color(0xFFD1FAE5), text: Color(0xFF10B981), icon: Icons.construction_outlined),
   'motor':    (label: 'Motor',       bg: Color(0xFFFEE2E2), text: Color(0xFFDC2626), icon: Icons.local_fire_department_outlined),
   'elektrik': (label: 'Elektrik',    bg: Color(0xFFFEF9C3), text: Color(0xFFCA8A04), icon: Icons.bolt_outlined),
   'fren':     (label: 'Fren',        bg: Color(0xFFFFEDD5), text: Color(0xFFEA580C), icon: Icons.do_not_disturb_on_outlined),

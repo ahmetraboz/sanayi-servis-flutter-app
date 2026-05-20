@@ -309,6 +309,7 @@ class _BidCard extends StatelessWidget {
     final price = bid['price'];
     final requestId = bid['requestId'];
 
+    final priceVal = double.tryParse('$price') ?? 0.0;
     final isAccepted = bidStatus == 'accepted';
     final isRejected = bidStatus == 'rejected';
 
@@ -351,8 +352,12 @@ class _BidCard extends StatelessWidget {
                     ),
                     const SizedBox(width: 12),
                     Text(
-                      _fmtPrice(price),
-                      style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: AppColors.blue600),
+                      priceVal == 0 ? 'Talebi Reddettiniz' : _fmtPrice(price),
+                      style: TextStyle(
+                        fontSize: priceVal == 0 ? 13 : 18,
+                        fontWeight: FontWeight.bold,
+                        color: priceVal == 0 ? AppColors.red700 : AppColors.blue600,
+                      ),
                     ),
                   ],
                 ),

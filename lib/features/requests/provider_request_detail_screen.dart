@@ -13,6 +13,7 @@ import 'provider_request_detail_notifier.dart';
 typedef _Cat = ({String label, Color bg, Color text, IconData icon});
 
 const _categories = <String, _Cat>{
+  'bakim':    (label: 'Periyodik Bakım', bg: Color(0xFFD1FAE5), text: Color(0xFF10B981), icon: Icons.construction_outlined),
   'motor':    (label: 'Motor',       bg: Color(0xFFFEE2E2), text: Color(0xFFDC2626), icon: Icons.local_fire_department_outlined),
   'elektrik': (label: 'Elektrik',    bg: Color(0xFFFEF9C3), text: Color(0xFFCA8A04), icon: Icons.bolt_outlined),
   'fren':     (label: 'Fren',        bg: Color(0xFFFFEDD5), text: Color(0xFFEA580C), icon: Icons.do_not_disturb_on_outlined),
@@ -145,13 +146,25 @@ class ProviderRequestDetailScreen extends ConsumerWidget {
         _HeaderCard(request: req),
         const SizedBox(height: 12),
         if (state.myBidStatus == 'rejected') ...[
-          _StatusBanner(
-            icon: Icons.cancel_outlined,
-            color: AppColors.red700,
-            bg: AppColors.red50,
-            title: 'Teklifiniz Reddedildi',
-            subtitle: 'Müşteri bu talep için farklı bir servisi tercih etti.',
-          ),
+          (() {
+            final priceVal = double.tryParse('${state.myBid?['price']}') ?? 0.0;
+            if (priceVal == 0.0) {
+              return _StatusBanner(
+                icon: Icons.info_outline,
+                color: AppColors.gray700,
+                bg: AppColors.gray100,
+                title: 'Talebi Reddettiniz',
+                subtitle: 'Bu talebi pas geçtiniz.',
+              );
+            }
+            return _StatusBanner(
+              icon: Icons.cancel_outlined,
+              color: AppColors.red700,
+              bg: AppColors.red50,
+              title: 'Teklifiniz Reddedildi',
+              subtitle: 'Müşteri bu talep için farklı bir servisi tercih etti.',
+            );
+          })(),
           const SizedBox(height: 12),
         ],
         if (state.myBidStatus == 'pending') ...[
@@ -344,6 +357,7 @@ class _VehicleCard extends StatelessWidget {
     final model = request['vehicleModel'] as String? ?? '';
     final year = request['vehicleYear'] as int?;
     final plate = request['vehiclePlate'] as String?;
+    final mileage = request['vehicleMileage'] ?? request['mileage'];
 
     return Container(
       padding: const EdgeInsets.all(16),
@@ -414,6 +428,18 @@ class _VehicleCard extends StatelessWidget {
                               Text(
                                 '$year Model',
                                 style: const TextStyle(fontSize: 13, color: AppColors.gray500),
+                              ),
+                            ],
+                          ),
+                        if (mileage != null)
+                          Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              const Icon(Icons.speed_outlined, size: 14, color: AppColors.gray400),
+                              const SizedBox(width: 3),
+                              Text(
+                                '${mileage.toString().replaceAllMapped(RegExp(r"(\d{1,3})(?=(\d{3})+(?!\d))"), (m) => "${m[1]}.")} km',
+                                style: const TextStyle(fontSize: 13, color: AppColors.gray500, fontWeight: FontWeight.w500),
                               ),
                             ],
                           ),
