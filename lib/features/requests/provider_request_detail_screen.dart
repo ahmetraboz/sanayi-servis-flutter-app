@@ -145,6 +145,10 @@ class ProviderRequestDetailScreen extends ConsumerWidget {
       children: [
         _HeaderCard(request: req),
         const SizedBox(height: 12),
+        if (state.myBid?['dateProposedBy'] == 'customer') ...[
+          _buildDateNegotiationCard(context, state, notifier),
+          const SizedBox(height: 12),
+        ],
         if (state.myBidStatus == 'rejected') ...[
           (() {
             final priceVal = double.tryParse('${state.myBid?['price']}') ?? 0.0;
@@ -167,7 +171,7 @@ class ProviderRequestDetailScreen extends ConsumerWidget {
           })(),
           const SizedBox(height: 12),
         ],
-        if (state.myBidStatus == 'pending') ...[
+        if (state.myBidStatus == 'pending' && state.myBid?['dateProposedBy'] != 'customer') ...[
           _StatusBanner(
             icon: Icons.hourglass_top_rounded,
             color: const Color(0xFFD97706),
@@ -239,6 +243,162 @@ class ProviderRequestDetailScreen extends ConsumerWidget {
           ),
         ],
       ],
+      ),
+    );
+  }
+
+  Widget _buildDateNegotiationCard(
+    BuildContext context,
+    ProviderRequestDetailState state,
+    ProviderRequestDetailNotifier notifier,
+  ) {
+    final proposedDateStr = state.myBid?['proposedDate'] as String?;
+    String formattedDate = '';
+    if (proposedDateStr != null) {
+      try {
+        final dt = DateTime.parse(proposedDateStr).toLocal();
+        const months = ['Ocak', 'Şubat', 'Mart', 'Nisan', 'Mayıs', 'Haziran', 'Temmuz', 'Ağustos', 'Eylül', 'Ekim', 'Kasım', 'Aralık'];
+        formattedDate = '${dt.day} ${months[dt.month - 1]} ${dt.year}';
+      } catch (_) {
+        formattedDate = proposedDateStr;
+      }
+    }
+
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: const Color(0xFFFFFBEB), // Amber 50
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: const Color(0xFFFCD34D)), // Amber 300
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Icon(
+                Icons.calendar_today_rounded,
+                size: 20,
+                color: Color(0xFFD97706), // Amber 600
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      'Müşteri Yeni Randevu Tarihi Öneriyor',
+                      style: TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w700,
+                        color: Color(0xFF92400E), // Amber 800
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      'Önerilen Tarih: $formattedDate',
+                      style: const TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w600,
+                        color: Color(0xFFB45309), // Amber 700
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    const Text(
+                      'Bu tarihi kabul edebilir veya karşı bir tarih teklif edebilirsiniz.',
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: Color(0xFFD97706), // Amber 600
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 14),
+          Row(
+            children: [
+              Expanded(
+                child: ElevatedButton.icon(
+                  onPressed: () async {
+                    final ok = await notifier.acceptProposedDate();
+                    if (ok && context.mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                          content: Text('Randevu tarihi kabul edildi'),
+                          backgroundColor: Color(0xFF16A34A),
+                        ),
+                      );
+                    }
+                  },
+                  icon: const Icon(Icons.check, size: 16),
+                  label: const Text(
+                    'Tarihi Kabul Et',
+                    style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
+                  ),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppColors.blue600,
+                    foregroundColor: Colors.white,
+                    elevation: 0,
+                    padding: const EdgeInsets.symmetric(vertical: 10),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: OutlinedButton.icon(
+                  onPressed: () {
+                    final dateFrom = state.request?['preferredDateFrom'] as String?;
+                    final dateTo = state.request?['preferredDateTo'] as String?;
+                    showModalBottomSheet(
+                      context: context,
+                      useRootNavigator: true,
+                      backgroundColor: Colors.white,
+                      shape: const RoundedRectangleBorder(
+                        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+                      ),
+                      builder: (_) => DatePickerSheet(
+                        title: 'Karşı Tarih Teklif Et',
+                        initialDate: proposedDateStr,
+                        highlightFrom: dateFrom,
+                        highlightTo: dateTo,
+                        onSelected: (date) async {
+                          final ok = await notifier.counterProposeDate(date);
+                          if (ok && context.mounted) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(
+                                content: Text('Karşı tarih teklifi gönderildi'),
+                                backgroundColor: Color(0xFF16A34A),
+                              ),
+                            );
+                          }
+                        },
+                      ),
+                    );
+                  },
+                  icon: const Icon(Icons.edit_calendar_outlined, size: 16),
+                  label: const Text(
+                    'Başka Tarih Öner',
+                    style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
+                  ),
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: AppColors.blue600,
+                    side: const BorderSide(color: AppColors.blue600),
+                    padding: const EdgeInsets.symmetric(vertical: 10),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ],
       ),
     );
   }
@@ -1829,7 +1989,6 @@ class _JobUpdateSheetState extends State<_JobUpdateSheet> {
   static const _updateTypes = [
     ('progress', 'İlerleme'),
     ('delay', 'Gecikme'),
-    ('issue', 'Sorun'),
   ];
 
   static const _kdvOptions = [0.0, 10.0, 20.0];

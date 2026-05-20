@@ -235,6 +235,34 @@ class ProviderRequestDetailNotifier extends StateNotifier<ProviderRequestDetailS
       return false;
     }
   }
+
+  Future<bool> acceptProposedDate() async {
+    final bidId = state.myBid?['id'] as int?;
+    if (bidId == null) return false;
+    state = state.copyWith(loading: true, actionError: null);
+    try {
+      await _api.post('/api/bids/$bidId/accept-date');
+      await loadDetail();
+      return true;
+    } on DioException catch (e) {
+      state = state.copyWith(loading: false, actionError: e.message ?? 'Tarih kabul edilemedi');
+      return false;
+    }
+  }
+
+  Future<bool> counterProposeDate(String date) async {
+    final bidId = state.myBid?['id'] as int?;
+    if (bidId == null) return false;
+    state = state.copyWith(loading: true, actionError: null);
+    try {
+      await _api.post('/api/bids/$bidId/counter-propose-date', data: {'date': date});
+      await loadDetail();
+      return true;
+    } on DioException catch (e) {
+      state = state.copyWith(loading: false, actionError: e.message ?? 'Karşı tarih önerilemedi');
+      return false;
+    }
+  }
 }
 
 final providerRequestDetailProvider = StateNotifierProvider.autoDispose

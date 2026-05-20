@@ -747,7 +747,6 @@ class _UpdateFormSection extends StatefulWidget {
     ('progress', 'İlerleme'),
     ('delay', 'Gecikme'),
     ('completed', 'Tamamlandı'),
-    ('issue', 'Sorun'),
   ];
 
   static const _kdvOptions = [0.0, 10.0, 20.0];

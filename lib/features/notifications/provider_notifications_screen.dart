@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import '../../../core/providers/notification_polling_provider.dart';
 import '../../../core/theme/theme.dart';
 import '../../../shared/widgets/shared_pagination.dart';
 import 'provider_notifications_notifier.dart';
@@ -22,6 +23,16 @@ class ProviderNotificationsScreen extends ConsumerStatefulWidget {
 
 class _ProviderNotificationsScreenState extends ConsumerState<ProviderNotificationsScreen> {
   String _activeFilter = 'all';
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      if (!mounted) return;
+      await ref.read(providerNotificationsProvider.notifier).markAllAsRead();
+      if (mounted) ref.read(notificationPollingProvider.notifier).refresh();
+    });
+  }
 
   List<NotificationItem> _filtered(List<NotificationItem> all) {
     if (_activeFilter == 'all') return all;
