@@ -58,27 +58,9 @@ class _ProviderProfileScreenState extends ConsumerState<ProviderProfileScreen> {
         bottom: false,
         child: Column(
           children: [
-            PageHeader(
+            const PageHeader(
               title: 'İşletme Profili',
-              action: GestureDetector(
-                onTap: () => _showLogoutDialog(context),
-                child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                  decoration: BoxDecoration(
-                    color: AppColors.red50,
-                    borderRadius: BorderRadius.circular(10),
-                    border: Border.all(color: AppColors.red100),
-                  ),
-                  child: const Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Icon(Icons.logout, size: 16, color: AppColors.red700),
-                      SizedBox(width: 5),
-                      Text('Çıkış', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: AppColors.red700)),
-                    ],
-                  ),
-                ),
-              ),
+              action: NotificationIconButton(),
             ),
             Expanded(child: _buildBody(state)),
           ],
@@ -163,6 +145,8 @@ class _ProviderProfileScreenState extends ConsumerState<ProviderProfileScreen> {
             const SizedBox(height: 12),
             _WorkingHoursCard(profile: profile),
             const SizedBox(height: 24),
+            _LogoutButton(onTap: () => _showLogoutDialog(context)),
+            const SizedBox(height: 16),
           ],
         ),
       ),
@@ -1640,6 +1624,45 @@ class _Field extends StatelessWidget {
           ),
         ),
       ],
+    );
+  }
+}
+
+// ─── Logout Button ───────────────────────────────────────────────────────────
+
+class _LogoutButton extends StatelessWidget {
+  final VoidCallback onTap;
+
+  const _LogoutButton({required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        width: double.infinity,
+        padding: const EdgeInsets.symmetric(vertical: 16),
+        decoration: BoxDecoration(
+          color: AppColors.red50,
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: AppColors.red100),
+        ),
+        child: const Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(Icons.logout_rounded, size: 18, color: AppColors.red700),
+            SizedBox(width: 8),
+            Text(
+              'Çıkış Yap',
+              style: TextStyle(
+                fontSize: 15,
+                fontWeight: FontWeight.w600,
+                color: AppColors.red700,
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }

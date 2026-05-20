@@ -3,7 +3,6 @@ import '../../features/dashboard/provider_dashboard_screen.dart';
 import '../../features/requests/provider_requests_screen.dart';
 import '../../features/bids/provider_bids_screen.dart';
 import '../../features/jobs/provider_jobs_screen.dart';
-import '../../features/notifications/provider_notifications_screen.dart';
 import '../../features/profile/provider_profile_screen.dart';
 import '../../features/reviews/provider_reviews_screen.dart';
 import '../../features/guest_bookings/provider_guest_bookings_screen.dart';
@@ -27,10 +26,6 @@ final providerShellRoute = ShellRoute(
     GoRoute(
       path: '/provider/bids',
       builder: (context, state) => const ProviderBidsScreen(),
-    ),
-    GoRoute(
-      path: '/provider/notifications',
-      builder: (context, state) => const ProviderNotificationsScreen(),
     ),
     GoRoute(
       path: '/provider/profile',

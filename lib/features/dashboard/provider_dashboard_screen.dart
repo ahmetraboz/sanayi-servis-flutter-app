@@ -1,7 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:go_router/go_router.dart';
-import '../../../core/providers/badge_counts_provider.dart';
 import '../../../core/theme/theme.dart';
 import '../../../shared/widgets/page_header.dart';
 import '../../../shared/widgets/skeleton.dart';
@@ -19,7 +17,6 @@ class ProviderDashboardScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final state = ref.watch(providerDashboardProvider);
     final notifier = ref.read(providerDashboardProvider.notifier);
-    final unread = ref.watch(badgeCountsProvider).valueOrNull?.unreadNotifications ?? 0;
 
     return Scaffold(
       backgroundColor: AppColors.gray50,
@@ -27,30 +24,9 @@ class ProviderDashboardScreen extends ConsumerWidget {
         bottom: false,
         child: Column(
           children: [
-            PageHeader(
+            const PageHeader(
               title: 'Anasayfa',
-              action: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  GestureDetector(
-                    onTap: () => context.push('/provider/notifications'),
-                    child: Badge.count(
-                      count: unread,
-                      isLabelVisible: unread > 0,
-                      backgroundColor: Colors.red,
-                      textColor: Colors.white,
-                      textStyle: const TextStyle(fontSize: 10, fontWeight: FontWeight.w700),
-                      child: const Icon(Icons.notifications_outlined, color: AppColors.gray600),
-                    ),
-                  ),
-                  const SizedBox(width: 16),
-                  if (!state.loading)
-                    GestureDetector(
-                      onTap: notifier.load,
-                      child: const Icon(Icons.refresh_outlined, color: AppColors.gray600),
-                    ),
-                ],
-              ),
+              action: NotificationIconButton(),
             ),
             Expanded(
               child: RefreshIndicator(

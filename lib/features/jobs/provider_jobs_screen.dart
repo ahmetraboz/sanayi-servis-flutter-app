@@ -4,8 +4,8 @@ import 'package:go_router/go_router.dart';
 import '../../../core/theme/theme.dart';
 import '../../../shared/widgets/date_picker_sheet.dart';
 import '../../../shared/widgets/page_header.dart';
-import '../../../shared/widgets/shared_pagination.dart';
 import '../../../shared/widgets/skeleton.dart';
+import '../../../shared/widgets/shared_pagination.dart';
 import 'provider_jobs_notifier.dart';
 
 class ProviderJobsScreen extends ConsumerWidget {
@@ -22,7 +22,7 @@ class ProviderJobsScreen extends ConsumerWidget {
         bottom: false,
         child: Column(
           children: [
-            const PageHeader(title: 'İşlerim'),
+            const PageHeader(title: 'İşlerim', action: NotificationIconButton()),
             Expanded(
               child: RefreshIndicator(
                 color: AppColors.blue600,

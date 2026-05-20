@@ -46,25 +46,9 @@ class ProviderRequestsScreen extends ConsumerWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            PageHeader(
+            const PageHeader(
               title: 'Açık Talepler',
-              action: state.total > 0
-                  ? Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFFEFF6FF),
-                        borderRadius: BorderRadius.circular(20),
-                      ),
-                      child: Text(
-                        '${state.total} talep',
-                        style: const TextStyle(
-                          fontSize: 12,
-                          fontWeight: FontWeight.w600,
-                          color: AppColors.primary700,
-                        ),
-                      ),
-                    )
-                  : null,
+              action: NotificationIconButton(),
             ),
             _FilterBar(
               activeCategory: state.activeCategory,

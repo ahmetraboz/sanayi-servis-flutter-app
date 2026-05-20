@@ -1,4 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
+import '../../core/providers/badge_counts_provider.dart';
 import '../../core/theme/theme.dart';
 
 class PageHeader extends StatelessWidget {
@@ -51,6 +54,30 @@ class PageHeader extends StatelessWidget {
             action!,
           ],
         ],
+      ),
+    );
+  }
+}
+
+class NotificationIconButton extends ConsumerWidget {
+  const NotificationIconButton({super.key});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final unread = ref.watch(badgeCountsProvider).unreadNotifications;
+    return GestureDetector(
+      onTap: () => context.push('/provider/notifications'),
+      behavior: HitTestBehavior.opaque,
+      child: Padding(
+        padding: const EdgeInsets.all(4),
+        child: Badge.count(
+          count: unread,
+          isLabelVisible: unread > 0,
+          backgroundColor: Colors.red,
+          textColor: Colors.white,
+          textStyle: const TextStyle(fontSize: 10, fontWeight: FontWeight.w700),
+          child: const Icon(Icons.notifications_outlined, color: AppColors.gray600, size: 24),
+        ),
       ),
     );
   }

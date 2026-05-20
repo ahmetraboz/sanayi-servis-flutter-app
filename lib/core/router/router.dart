@@ -5,6 +5,7 @@ import '../auth/auth_notifier.dart';
 import '../../shared/models/user_model.dart';
 import '../../features/auth/login_screen.dart';
 import '../../features/auth/register_screen.dart';
+import '../../features/notifications/provider_notifications_screen.dart';
 import '../../features/requests/provider_request_detail_screen.dart';
 import '../../features/guest_bookings/provider_guest_booking_detail_screen.dart';
 import 'provider_routes.dart';
@@ -19,6 +20,10 @@ final routerProvider = Provider<GoRouter>((ref) {
     routes: [
       GoRoute(path: '/login', builder: (context, state) => const LoginScreen()),
       GoRoute(path: '/register', builder: (context, state) => const RegisterScreen()),
+      GoRoute(
+        path: '/provider/notifications',
+        builder: (context, state) => const ProviderNotificationsScreen(),
+      ),
       GoRoute(
         path: '/provider/requests/:id',
         builder: (context, state) => ProviderRequestDetailScreen(

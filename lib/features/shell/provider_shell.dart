@@ -2,21 +2,41 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../../core/providers/badge_counts_provider.dart';
+import '../../../core/providers/notification_polling_provider.dart';
 import '../../../core/theme/theme.dart';
+import '../notifications/provider_notifications_notifier.dart';
 
-class ProviderShell extends ConsumerWidget {
+class ProviderShell extends ConsumerStatefulWidget {
   final Widget child;
 
   const ProviderShell({super.key, required this.child});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<ProviderShell> createState() => _ProviderShellState();
+}
+
+class _ProviderShellState extends ConsumerState<ProviderShell> {
+  @override
+  Widget build(BuildContext context) {
     final path = GoRouterState.of(context).uri.path;
     final selectedIndex = _indexFromPath(path);
-    final counts = ref.watch(badgeCountsProvider).valueOrNull ?? const BadgeCounts();
+    final counts = ref.watch(badgeCountsProvider);
+
+    ref.listen<List<NotificationItem>>(
+      notificationPollingProvider.select((s) => s.pendingBanners),
+      (prev, next) {
+        if (next.isNotEmpty) {
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            if (!mounted) return;
+            final banner = next.first;
+            ref.read(notificationPollingProvider.notifier).consumeBanner();
+            _showBanner(context, banner);
+          });
+        }
+      },
+    );
 
     final bottomPad = MediaQuery.of(context).padding.bottom;
-    // pill content (55px) + top margin (8px) + bottom margin (12px) = 75px above safe area
     const double navContentHeight = 75;
 
     return Scaffold(
@@ -24,7 +44,7 @@ class ProviderShell extends ConsumerWidget {
         children: [
           Padding(
             padding: EdgeInsets.only(bottom: bottomPad + navContentHeight),
-            child: child,
+            child: widget.child,
           ),
           Positioned(
             left: 0,
@@ -40,6 +60,87 @@ class ProviderShell extends ConsumerWidget {
       ),
     );
   }
+
+  void _showBanner(BuildContext context, NotificationItem notif) {
+    final (icon, color) = _bannerStyle(notif.type);
+    final link = notif.link;
+
+    ScaffoldMessenger.of(context)
+      ..clearSnackBars()
+      ..showSnackBar(
+        SnackBar(
+          content: Row(
+            children: [
+              Container(
+                width: 36,
+                height: 36,
+                decoration: BoxDecoration(
+                  color: Colors.white.withValues(alpha: 0.2),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Icon(icon, size: 18, color: Colors.white),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      notif.title,
+                      style: const TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w700,
+                        color: Colors.white,
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    if (notif.message != null && notif.message!.isNotEmpty) ...[
+                      const SizedBox(height: 2),
+                      Text(
+                        notif.message!,
+                        style: const TextStyle(
+                          fontSize: 12,
+                          color: Colors.white70,
+                        ),
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+            ],
+          ),
+          backgroundColor: color,
+          behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(14)),
+          margin: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+          duration: const Duration(seconds: 5),
+          elevation: 6,
+          action: link != null && link.isNotEmpty
+              ? SnackBarAction(
+                  label: 'Görüntüle',
+                  textColor: Colors.white,
+                  onPressed: () => context.push(link),
+                )
+              : null,
+        ),
+      );
+  }
+
+  (IconData, Color) _bannerStyle(String type) => switch (type) {
+        'bid.accepted' || 'bid' =>
+          (Icons.local_offer_rounded, AppColors.blue600),
+        'new_request' || 'request' =>
+          (Icons.description_rounded, AppColors.primary600),
+        'review' || 'completion' =>
+          (Icons.star_rounded, AppColors.amber600),
+        'update' => (Icons.update_rounded, const Color(0xFF7C3AED)),
+        _ => (Icons.notifications_rounded, AppColors.gray600),
+      };
 
   int _indexFromPath(String path) {
     if (path.startsWith('/provider/requests')) return 1;

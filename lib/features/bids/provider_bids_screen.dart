@@ -29,7 +29,7 @@ class ProviderBidsScreen extends ConsumerWidget {
         bottom: false,
         child: Column(
           children: [
-            const PageHeader(title: 'Tekliflerim'),
+            const PageHeader(title: 'Tekliflerim', action: NotificationIconButton()),
             Container(
               color: Colors.white,
               padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
