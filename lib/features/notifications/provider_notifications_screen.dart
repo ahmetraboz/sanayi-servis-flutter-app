@@ -273,22 +273,38 @@ class _NotificationCard extends StatelessWidget {
   }
 
   (IconData, Color, Color) _typeStyle(String type) {
-    if (type.contains('bid')) {
-      if (type.contains('rejected')) {
+    switch (type) {
+      case 'bid.accepted':
+        return (Icons.check_circle_outline, AppColors.primary600, AppColors.green50);
+      case 'bid.rejected':
         return (Icons.cancel_outlined, AppColors.red700, AppColors.red50);
-      }
-      return (Icons.local_offer_outlined, AppColors.blue600, const Color(0xFFEFF6FF));
+      case 'new_bid':
+        return (Icons.local_offer_outlined, AppColors.blue600, const Color(0xFFEFF6FF));
+      case 'request':
+        return (Icons.inbox_outlined, AppColors.primary600, AppColors.green50);
+      case 'info_provided':
+        return (Icons.check_box_outlined, AppColors.primary600, AppColors.green50);
+      case 'info_rejected':
+        return (Icons.do_not_disturb_outlined, AppColors.amber600, AppColors.amber50);
+      case 'completion':
+        return (Icons.car_repair_outlined, AppColors.green700, AppColors.green50);
+      case 'update':
+        return (Icons.update_outlined, const Color(0xFF7C3AED), const Color(0xFFF5F3FF));
+      case 'review':
+        return (Icons.star_outline, AppColors.yellow400, const Color(0xFFFEF9C3));
+      case 'service.approved':
+        return (Icons.verified_outlined, AppColors.primary600, AppColors.green50);
+      case 'service.rejected':
+        return (Icons.block_outlined, AppColors.red700, AppColors.red50);
+      case 'service.suspended':
+        return (Icons.pause_circle_outline, AppColors.amber600, AppColors.amber50);
+      case 'account.activated':
+        return (Icons.person_outline, AppColors.primary600, AppColors.green50);
+      case 'account.deactivated':
+        return (Icons.person_off_outlined, AppColors.red700, AppColors.red50);
+      default:
+        return (Icons.notifications_outlined, AppColors.gray500, AppColors.gray100);
     }
-    if (type.contains('review') || type.contains('completion')) {
-      return (Icons.star_outline, AppColors.yellow400, const Color(0xFFFEF9C3));
-    }
-    if (type.contains('info_request') || type.contains('request')) {
-      return (Icons.info_outline, AppColors.primary600, AppColors.green50);
-    }
-    if (type.contains('update')) {
-      return (Icons.update_outlined, const Color(0xFF7C3AED), const Color(0xFFF5F3FF));
-    }
-    return (Icons.notifications_outlined, AppColors.gray500, AppColors.gray100);
   }
 
   @override
