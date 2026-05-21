@@ -272,13 +272,24 @@ class _NotificationCard extends StatelessWidget {
     }
   }
 
-  (IconData, Color, Color) _typeStyle(String type) => switch (type) {
-    'bid' => (Icons.local_offer_outlined, AppColors.blue600, const Color(0xFFEFF6FF)),
-    'review' || 'completion' => (Icons.star_outline, AppColors.yellow400, const Color(0xFFFEF9C3)),
-    'info_request' || 'request' => (Icons.info_outline, AppColors.primary600, AppColors.green50),
-    'update' => (Icons.update_outlined, const Color(0xFF7C3AED), const Color(0xFFF5F3FF)),
-    _ => (Icons.notifications_outlined, AppColors.gray500, AppColors.gray100),
-  };
+  (IconData, Color, Color) _typeStyle(String type) {
+    if (type.contains('bid')) {
+      if (type.contains('rejected')) {
+        return (Icons.cancel_outlined, AppColors.red700, AppColors.red50);
+      }
+      return (Icons.local_offer_outlined, AppColors.blue600, const Color(0xFFEFF6FF));
+    }
+    if (type.contains('review') || type.contains('completion')) {
+      return (Icons.star_outline, AppColors.yellow400, const Color(0xFFFEF9C3));
+    }
+    if (type.contains('info_request') || type.contains('request')) {
+      return (Icons.info_outline, AppColors.primary600, AppColors.green50);
+    }
+    if (type.contains('update')) {
+      return (Icons.update_outlined, const Color(0xFF7C3AED), const Color(0xFFF5F3FF));
+    }
+    return (Icons.notifications_outlined, AppColors.gray500, AppColors.gray100);
+  }
 
   @override
   Widget build(BuildContext context) {
