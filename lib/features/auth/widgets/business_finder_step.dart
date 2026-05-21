@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import '../../../core/api/api_client.dart';
 import '../../../core/theme/theme.dart';
+import '../../../shared/widgets/location_picker_sheet.dart';
 
 class BusinessFinderResult {
   final String companyName;
@@ -90,11 +91,14 @@ class _BusinessFinderStepState extends ConsumerState<BusinessFinderStep>
   // ─── Manual tab state ───────────────────────────────────────────────────────
   final _manualCompanyCtrl = TextEditingController();
   final _manualAddressCtrl = TextEditingController();
-  final _manualCityCtrl = TextEditingController();
-  final _manualDistrictCtrl = TextEditingController();
+  String? _manualCity;
+  String? _manualDistrict;
   final _manualPhoneCtrl = TextEditingController();
   LatLng? _manualPin;
   bool _reverseGeocoding = false;
+  bool _forwardGeocoding = false;
+  Timer? _addressDebounce;
+  GoogleMapController? _manualMapCtrl;
 
   // ─── Map controllers ────────────────────────────────────────────────────────
   GoogleMapController? _googleMapCtrl;
@@ -105,8 +109,6 @@ class _BusinessFinderStepState extends ConsumerState<BusinessFinderStep>
     _tabController = TabController(length: 2, vsync: this);
     _tabController.addListener(_emitResult);
     _manualCompanyCtrl.addListener(_emitResult);
-    _manualCityCtrl.addListener(_emitResult);
-    _manualDistrictCtrl.addListener(_emitResult);
   }
 
   @override
@@ -115,18 +117,17 @@ class _BusinessFinderStepState extends ConsumerState<BusinessFinderStep>
     _searchCtrl.dispose();
     _manualCompanyCtrl.dispose();
     _manualAddressCtrl.dispose();
-    _manualCityCtrl.dispose();
-    _manualDistrictCtrl.dispose();
     _manualPhoneCtrl.dispose();
     _searchDebounce?.cancel();
+    _addressDebounce?.cancel();
     super.dispose();
   }
 
   BusinessFinderResult get _currentManualResult => BusinessFinderResult(
         companyName: _manualCompanyCtrl.text.trim(),
         address: _manualAddressCtrl.text.trim(),
-        city: _manualCityCtrl.text.trim(),
-        district: _manualDistrictCtrl.text.trim(),
+        city: _manualCity ?? '',
+        district: _manualDistrict ?? '',
         phone: _manualPhoneCtrl.text.trim(),
         latitude: _manualPin?.latitude,
         longitude: _manualPin?.longitude,
@@ -241,8 +242,8 @@ class _BusinessFinderStepState extends ConsumerState<BusinessFinderStep>
       final address = d['formattedAddress'] as String? ?? '';
       if (!mounted) return;
       setState(() {
-        if (city.isNotEmpty) _manualCityCtrl.text = city;
-        if (district.isNotEmpty) _manualDistrictCtrl.text = district;
+        if (city.isNotEmpty) _manualCity = city;
+        if (district.isNotEmpty) _manualDistrict = district;
         if (address.isNotEmpty && _manualAddressCtrl.text.isEmpty) _manualAddressCtrl.text = address;
       });
       _emitResult();
@@ -250,6 +251,37 @@ class _BusinessFinderStepState extends ConsumerState<BusinessFinderStep>
       // sessizce geç — kullanıcı manuel doldurabilir
     } finally {
       if (mounted) setState(() => _reverseGeocoding = false);
+    }
+  }
+
+  void _onAddressChanged(String value) {
+    _addressDebounce?.cancel();
+    if (value.trim().length < 5) return;
+    _addressDebounce = Timer(const Duration(milliseconds: 600), () => _geocodeAddress(value.trim()));
+  }
+
+  Future<void> _geocodeAddress(String address) async {
+    if (_manualCity == null) return;
+    final query = [_manualCity, _manualDistrict, address].whereType<String>().join(', ');
+    setState(() => _forwardGeocoding = true);
+    try {
+      final api = ref.read(apiClientProvider);
+      final res = await api.get('/api/public/places/autocomplete', queryParameters: {'input': query});
+      final suggestions = (res.data['suggestions'] as List? ?? []).cast<Map<String, dynamic>>();
+      if (suggestions.isEmpty || !mounted) return;
+      final placeId = suggestions.first['placeId'] as String?;
+      if (placeId == null) return;
+      final detailRes = await api.get('/api/public/places/details', queryParameters: {'placeId': placeId});
+      final d = detailRes.data as Map<String, dynamic>;
+      final lat = (d['latitude'] as num?)?.toDouble();
+      final lng = (d['longitude'] as num?)?.toDouble();
+      if (lat == null || lng == null || !mounted) return;
+      setState(() => _manualPin = LatLng(lat, lng));
+      await _manualMapCtrl?.animateCamera(CameraUpdate.newLatLngZoom(LatLng(lat, lng), 16));
+      _emitResult();
+    } catch (_) {
+    } finally {
+      if (mounted) setState(() => _forwardGeocoding = false);
     }
   }
 
@@ -298,9 +330,9 @@ class _BusinessFinderStepState extends ConsumerState<BusinessFinderStep>
                   mainAxisAlignment: MainAxisAlignment.center,
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    Icon(Icons.location_on_outlined, size: 16),
+                    Icon(Icons.edit_outlined, size: 16),
                     SizedBox(width: 6),
-                    Text('Haritada Seç'),
+                    Text('Manuel Girin'),
                   ],
                 ),
               ),
@@ -487,13 +519,75 @@ class _BusinessFinderStepState extends ConsumerState<BusinessFinderStep>
           const SizedBox(height: 12),
           _manualField(label: 'İşletme Adı *', ctrl: _manualCompanyCtrl, icon: Icons.business_outlined),
           const SizedBox(height: 10),
-          _manualField(label: 'Adres', ctrl: _manualAddressCtrl, icon: Icons.location_on_outlined),
-          const SizedBox(height: 10),
           Row(
             children: [
-              Expanded(child: _manualField(label: 'İl *', ctrl: _manualCityCtrl, icon: Icons.map_outlined)),
+              Expanded(
+                child: LocationPickerField(
+                  label: 'İl *',
+                  value: _manualCity,
+                  hint: 'İl seçin',
+                  onTap: () async {
+                    final city = await showCityPicker(context);
+                    if (city != null) {
+                      setState(() {
+                        _manualCity = city;
+                        _manualDistrict = null;
+                      });
+                      _emitResult();
+                    }
+                  },
+                ),
+              ),
               const SizedBox(width: 10),
-              Expanded(child: _manualField(label: 'İlçe *', ctrl: _manualDistrictCtrl, icon: Icons.map_outlined)),
+              Expanded(
+                child: LocationPickerField(
+                  label: 'İlçe *',
+                  value: _manualDistrict,
+                  hint: 'İlçe seçin',
+                  enabled: _manualCity != null,
+                  onTap: () async {
+                    if (_manualCity == null) return;
+                    final district = await showDistrictPicker(context, _manualCity!);
+                    if (district != null) {
+                      setState(() => _manualDistrict = district);
+                      _emitResult();
+                    }
+                  },
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  const Text('Adres', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w500, color: AppColors.gray700)),
+                  if (_forwardGeocoding) ...[
+                    const SizedBox(width: 8),
+                    const SizedBox(width: 12, height: 12, child: CircularProgressIndicator(strokeWidth: 2, color: AppColors.blue600)),
+                  ],
+                ],
+              ),
+              const SizedBox(height: 4),
+              TextField(
+                controller: _manualAddressCtrl,
+                style: const TextStyle(fontSize: 13, color: AppColors.gray900),
+                onChanged: _onAddressChanged,
+                decoration: InputDecoration(
+                  prefixIcon: const Icon(Icons.location_on_outlined, size: 16, color: AppColors.gray400),
+                  hintText: 'Sokak, mahalle, bina no...',
+                  hintStyle: const TextStyle(fontSize: 13, color: AppColors.gray400),
+                  isDense: true,
+                  filled: true,
+                  fillColor: Colors.white,
+                  contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: const BorderSide(color: AppColors.gray200)),
+                  enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: const BorderSide(color: AppColors.gray200)),
+                  focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: const BorderSide(color: AppColors.primary600)),
+                ),
+              ),
             ],
           ),
           const SizedBox(height: 10),
@@ -505,6 +599,7 @@ class _BusinessFinderStepState extends ConsumerState<BusinessFinderStep>
               borderRadius: BorderRadius.circular(12),
               child: GoogleMap(
                 initialCameraPosition: const CameraPosition(target: _turkeyCenter, zoom: 6),
+                onMapCreated: (c) => _manualMapCtrl = c,
                 onTap: _onMapTap,
                 markers: _manualPin != null
                     ? {Marker(markerId: const MarkerId('manual'), position: _manualPin!)}
