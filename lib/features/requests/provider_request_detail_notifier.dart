@@ -82,8 +82,9 @@ class ProviderRequestDetailState {
   bool get canComplete => canUpdate;
   bool get isInfoRequested => status == 'info_requested';
   bool get isInfoProvided => status == 'info_provided';
-  bool get isPendingReview => status == 'pending_review';
-  bool get isCompleted => status == 'completed';
+  bool get isPendingReview => status == 'pending_review' && acceptedBid != null;
+  bool get isCompleted => status == 'completed' && acceptedBid != null;
+
 }
 
 class ProviderRequestDetailNotifier extends StateNotifier<ProviderRequestDetailState> {
