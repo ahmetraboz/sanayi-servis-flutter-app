@@ -1,6 +1,8 @@
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../../../core/api/services/provider_api_service.dart';
 import '../../../core/theme/theme.dart';
@@ -145,10 +147,6 @@ class ProviderRequestDetailScreen extends ConsumerWidget {
       children: [
         _HeaderCard(request: req),
         const SizedBox(height: 12),
-        if (state.myBid?['dateProposedBy'] == 'customer') ...[
-          _buildDateNegotiationCard(context, state, notifier),
-          const SizedBox(height: 12),
-        ],
         if (state.myBidStatus == 'rejected') ...[
           (() {
             final priceVal = double.tryParse('${state.myBid?['price']}') ?? 0.0;
@@ -171,13 +169,38 @@ class ProviderRequestDetailScreen extends ConsumerWidget {
           })(),
           const SizedBox(height: 12),
         ],
-        if (state.myBidStatus == 'pending' && state.myBid?['dateProposedBy'] != 'customer') ...[
+        if (state.myBidStatus == 'pending') ...[
           _StatusBanner(
             icon: Icons.hourglass_top_rounded,
             color: const Color(0xFFD97706),
             bg: const Color(0xFFFFFBEB),
             title: 'Teklifiniz Değerlendiriliyor',
             subtitle: 'Müşteri teklifinizi inceliyor.',
+          ),
+          const SizedBox(height: 12),
+        ],
+        if (state.myBidStatus == 'pending' && state.myBid?['proposedDate'] != null) ...[
+          _DateNegotiationTimeline(
+            proposedDateStr: state.myBid!['proposedDate'] as String,
+            dateProposedBy: state.myBid!['dateProposedBy'] as String? ?? 'provider',
+            preferredDateFrom: req['preferredDateFrom'] as String?,
+            preferredDateTo: req['preferredDateTo'] as String?,
+            onAccept: () async {
+              final ok = await notifier.acceptProposedDate();
+              if (ok && context.mounted) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('Randevu tarihi kabul edildi'), backgroundColor: Color(0xFF16A34A)),
+                );
+              }
+            },
+            onCounter: (date) async {
+              final ok = await notifier.counterProposeDate(date);
+              if (ok && context.mounted) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('Karşı tarih teklifi gönderildi'), backgroundColor: Color(0xFF16A34A)),
+                );
+              }
+            },
           ),
           const SizedBox(height: 12),
         ],
@@ -247,158 +270,199 @@ class ProviderRequestDetailScreen extends ConsumerWidget {
     );
   }
 
-  Widget _buildDateNegotiationCard(
-    BuildContext context,
-    ProviderRequestDetailState state,
-    ProviderRequestDetailNotifier notifier,
-  ) {
-    final proposedDateStr = state.myBid?['proposedDate'] as String?;
-    String formattedDate = '';
-    if (proposedDateStr != null) {
-      try {
-        final dt = DateTime.parse(proposedDateStr).toLocal();
-        const months = ['Ocak', 'Şubat', 'Mart', 'Nisan', 'Mayıs', 'Haziran', 'Temmuz', 'Ağustos', 'Eylül', 'Ekim', 'Kasım', 'Aralık'];
-        formattedDate = '${dt.day} ${months[dt.month - 1]} ${dt.year}';
-      } catch (_) {
-        formattedDate = proposedDateStr;
-      }
+}
+
+// ─── Date Negotiation Timeline ────────────────────────────────────────────────
+
+class _DateNegotiationTimeline extends StatelessWidget {
+  final String proposedDateStr;
+  final String dateProposedBy;
+  final String? preferredDateFrom;
+  final String? preferredDateTo;
+  final Future<void> Function() onAccept;
+  final Future<void> Function(String date) onCounter;
+
+  const _DateNegotiationTimeline({
+    required this.proposedDateStr,
+    required this.dateProposedBy,
+    this.preferredDateFrom,
+    this.preferredDateTo,
+    required this.onAccept,
+    required this.onCounter,
+  });
+
+  static const _kMonths = [
+    'Ocak','Şubat','Mart','Nisan','Mayıs','Haziran',
+    'Temmuz','Ağustos','Eylül','Ekim','Kasım','Aralık',
+  ];
+
+  String _fmt(String iso) {
+    try {
+      final dt = DateTime.parse(iso).toLocal();
+      return '${dt.day} ${_kMonths[dt.month - 1]} ${dt.year}';
+    } catch (_) {
+      return iso;
     }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final proposedByProvider = dateProposedBy == 'provider';
+    final formattedDate = _fmt(proposedDateStr);
 
     return Container(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: const Color(0xFFFFFBEB), // Amber 50
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: const Color(0xFFFCD34D)), // Amber 300
+        color: const Color(0xFFF5F3FF),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: const Color(0xFFDDD6FE)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
+          // Başlık
+          const Row(
             children: [
-              const Icon(
-                Icons.calendar_today_rounded,
-                size: 20,
-                color: Color(0xFFD97706), // Amber 600
+              Icon(Icons.swap_vert_rounded, size: 15, color: Color(0xFF7C3AED)),
+              SizedBox(width: 6),
+              Text(
+                'Tarih Görüşmesi',
+                style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: Color(0xFF7C3AED)),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+
+          // Tarih satırı
+          Row(
+            children: [
+              Container(
+                width: 34,
+                height: 34,
+                decoration: BoxDecoration(
+                  color: proposedByProvider
+                      ? const Color(0xFFEDE9FE)
+                      : const Color(0xFFFEF3C7),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Icon(
+                  proposedByProvider ? Icons.build_outlined : Icons.person_outline,
+                  size: 17,
+                  color: proposedByProvider ? const Color(0xFF7C3AED) : const Color(0xFFD97706),
+                ),
               ),
               const SizedBox(width: 10),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Text(
-                      'Müşteri Yeni Randevu Tarihi Öneriyor',
+                    Text(
+                      proposedByProvider ? 'Önerdiğiniz Tarih' : 'Müşterinin Önerdiği Tarih',
+                      style: TextStyle(
+                        fontSize: 11,
+                        fontWeight: FontWeight.w500,
+                        color: proposedByProvider
+                            ? const Color(0xFF7C3AED)
+                            : const Color(0xFFD97706),
+                      ),
+                    ),
+                    const SizedBox(height: 1),
+                    Text(
+                      formattedDate,
                       style: TextStyle(
                         fontSize: 14,
                         fontWeight: FontWeight.w700,
-                        color: Color(0xFF92400E), // Amber 800
-                      ),
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      'Önerilen Tarih: $formattedDate',
-                      style: const TextStyle(
-                        fontSize: 13,
-                        fontWeight: FontWeight.w600,
-                        color: Color(0xFFB45309), // Amber 700
-                      ),
-                    ),
-                    const SizedBox(height: 2),
-                    const Text(
-                      'Bu tarihi kabul edebilir veya karşı bir tarih teklif edebilirsiniz.',
-                      style: TextStyle(
-                        fontSize: 12,
-                        color: Color(0xFFD97706), // Amber 600
+                        color: proposedByProvider
+                            ? const Color(0xFF4C1D95)
+                            : const Color(0xFF92400E),
                       ),
                     ),
                   ],
                 ),
               ),
+              if (proposedByProvider)
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFEDE9FE),
+                    borderRadius: BorderRadius.circular(6),
+                  ),
+                  child: const Text(
+                    'Müşteri Yanıt Bekliyor',
+                    style: TextStyle(fontSize: 10, fontWeight: FontWeight.w600, color: Color(0xFF7C3AED)),
+                  ),
+                ),
             ],
           ),
-          const SizedBox(height: 14),
-          Row(
-            children: [
-              Expanded(
-                child: ElevatedButton.icon(
-                  onPressed: () async {
-                    final ok = await notifier.acceptProposedDate();
-                    if (ok && context.mounted) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(
-                          content: Text('Randevu tarihi kabul edildi'),
-                          backgroundColor: Color(0xFF16A34A),
+
+          // Müşteri tarih önerdiyse aksiyon butonları
+          if (!proposedByProvider) ...[
+            Padding(
+              padding: const EdgeInsets.only(left: 17),
+              child: Container(width: 1.5, height: 12, color: const Color(0xFFDDD6FE)),
+            ),
+            Row(
+              children: [
+                Expanded(
+                  child: GestureDetector(
+                    onTap: () => _showCounterPicker(context),
+                    child: Container(
+                      height: 40,
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(10),
+                        border: Border.all(color: const Color(0xFFDDD6FE)),
+                      ),
+                      child: const Center(
+                        child: Text(
+                          'Başka Tarih Öner',
+                          style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: Color(0xFF7C3AED)),
                         ),
-                      );
-                    }
-                  },
-                  icon: const Icon(Icons.check, size: 16),
-                  label: const Text(
-                    'Tarihi Kabul Et',
-                    style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
-                  ),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: AppColors.blue600,
-                    foregroundColor: Colors.white,
-                    elevation: 0,
-                    padding: const EdgeInsets.symmetric(vertical: 10),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(10),
+                      ),
                     ),
                   ),
                 ),
-              ),
-              const SizedBox(width: 8),
-              Expanded(
-                child: OutlinedButton.icon(
-                  onPressed: () {
-                    final dateFrom = state.request?['preferredDateFrom'] as String?;
-                    final dateTo = state.request?['preferredDateTo'] as String?;
-                    showModalBottomSheet(
-                      context: context,
-                      useRootNavigator: true,
-                      backgroundColor: Colors.white,
-                      shape: const RoundedRectangleBorder(
-                        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: GestureDetector(
+                    onTap: onAccept,
+                    child: Container(
+                      height: 40,
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF7C3AED),
+                        borderRadius: BorderRadius.circular(10),
                       ),
-                      builder: (_) => DatePickerSheet(
-                        title: 'Karşı Tarih Teklif Et',
-                        initialDate: proposedDateStr,
-                        highlightFrom: dateFrom,
-                        highlightTo: dateTo,
-                        onSelected: (date) async {
-                          final ok = await notifier.counterProposeDate(date);
-                          if (ok && context.mounted) {
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(
-                                content: Text('Karşı tarih teklifi gönderildi'),
-                                backgroundColor: Color(0xFF16A34A),
-                              ),
-                            );
-                          }
-                        },
+                      child: const Center(
+                        child: Text(
+                          'Tarihi Kabul Et',
+                          style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: Colors.white),
+                        ),
                       ),
-                    );
-                  },
-                  icon: const Icon(Icons.edit_calendar_outlined, size: 16),
-                  label: const Text(
-                    'Başka Tarih Öner',
-                    style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
-                  ),
-                  style: OutlinedButton.styleFrom(
-                    foregroundColor: AppColors.blue600,
-                    side: const BorderSide(color: AppColors.blue600),
-                    padding: const EdgeInsets.symmetric(vertical: 10),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(10),
                     ),
                   ),
                 ),
-              ),
-            ],
-          ),
+              ],
+            ),
+          ],
         ],
+      ),
+    );
+  }
+
+  void _showCounterPicker(BuildContext context) {
+    showModalBottomSheet(
+      context: context,
+      useRootNavigator: true,
+      backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (_) => DatePickerSheet(
+        title: 'Karşı Tarih Teklif Et',
+        initialDate: proposedDateStr,
+        highlightFrom: preferredDateFrom,
+        highlightTo: preferredDateTo,
+        onSelected: onCounter,
       ),
     );
   }
@@ -983,6 +1047,18 @@ class _JobLogCard extends StatelessWidget {
                   final cfg = _typeConfig(type);
                   final desc = update['description'] as String? ?? '';
                   final parts = update['partsUsed'] as String?;
+                  final delayReason = update['delayReason'] as String?;
+                  final delayDays = update['delayEstimateDays'] as int?;
+                  final overBudgetReason = update['overBudgetReason'] as String?;
+                  final laborCost = double.tryParse(update['laborCost']?.toString() ?? '');
+                  final partsCost = double.tryParse(update['partsCost']?.toString() ?? '');
+                  final rawAttachments = update['attachmentUrls'];
+                  List<String> attachments = [];
+                  try {
+                    if (rawAttachments is List) {
+                      attachments = rawAttachments.whereType<String>().toList();
+                    }
+                  } catch (_) {}
                   final rawCostItems = update['costItems'];
                   final updateCostItems = rawCostItems is List
                       ? rawCostItems.whereType<Map<String, dynamic>>().toList()
@@ -993,7 +1069,8 @@ class _JobLogCard extends StatelessWidget {
                     0,
                     (s, e) => s + ((e['amount'] as num?)?.toDouble() ?? 0),
                   );
-                  final costTotal = costSubtotal + ((kdvAmount as num?)?.toDouble() ?? 0);
+                  final totalCostRaw = double.tryParse(update['totalCost']?.toString() ?? '');
+                  final costTotal = totalCostRaw ?? (costSubtotal + ((kdvAmount as num?)?.toDouble() ?? 0));
                   final createdAt = update['createdAt'] as String?;
                   final isLast = i == updates.length - 1;
 
@@ -1048,7 +1125,38 @@ class _JobLogCard extends StatelessWidget {
                                   child: Column(
                                     crossAxisAlignment: CrossAxisAlignment.start,
                                     children: [
-                                      Text(desc, style: const TextStyle(fontSize: 13, color: AppColors.gray700, height: 1.4)),
+                                      if (desc.isNotEmpty)
+                                        Text(desc, style: const TextStyle(fontSize: 13, color: AppColors.gray700, height: 1.4)),
+                                      // Gecikme detayı
+                                      if (type == 'delay' && delayReason != null) ...[
+                                        const SizedBox(height: 8),
+                                        Container(
+                                          padding: const EdgeInsets.all(10),
+                                          decoration: BoxDecoration(
+                                            color: const Color(0xFFFEF9C3),
+                                            borderRadius: BorderRadius.circular(8),
+                                            border: Border.all(color: const Color(0xFFFDE68A)),
+                                          ),
+                                          child: Column(
+                                            crossAxisAlignment: CrossAxisAlignment.start,
+                                            children: [
+                                              Row(children: [
+                                                const Icon(Icons.warning_amber_outlined, size: 13, color: Color(0xFFD97706)),
+                                                const SizedBox(width: 4),
+                                                const Text('Gecikme Nedeni', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: Color(0xFFD97706))),
+                                              ]),
+                                              const SizedBox(height: 4),
+                                              Text(delayReason, style: const TextStyle(fontSize: 12, color: Color(0xFF92400E), height: 1.4)),
+                                              if (delayDays != null) ...[
+                                                const SizedBox(height: 4),
+                                                Text('Tahmini ek süre: $delayDays gün',
+                                                    style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Color(0xFFB45309))),
+                                              ],
+                                            ],
+                                          ),
+                                        ),
+                                      ],
+                                      // Kullanılan parçalar
                                       if (parts != null && parts.isNotEmpty) ...[
                                         const SizedBox(height: 8),
                                         Row(
@@ -1068,7 +1176,8 @@ class _JobLogCard extends StatelessWidget {
                                           ],
                                         ),
                                       ],
-                                      if (updateCostItems.isNotEmpty) ...[
+                                      // Maliyet kalemleri
+                                      if (updateCostItems.isNotEmpty || laborCost != null || partsCost != null) ...[
                                         const SizedBox(height: 8),
                                         Container(
                                           padding: const EdgeInsets.all(10),
@@ -1078,19 +1187,17 @@ class _JobLogCard extends StatelessWidget {
                                           ),
                                           child: Column(
                                             children: [
+                                              if (laborCost != null && laborCost > 0)
+                                                _buildCostLine('İşçilik', laborCost, formatFn: _formatCost),
+                                              if (partsCost != null && partsCost > 0)
+                                                _buildCostLine('Parça', partsCost, formatFn: _formatCost),
                                               ...updateCostItems.map((item) => Padding(
                                                 padding: const EdgeInsets.only(bottom: 4),
                                                 child: Row(
                                                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                                                   children: [
-                                                    Text(
-                                                      item['name']?.toString() ?? '',
-                                                      style: const TextStyle(fontSize: 12, color: AppColors.gray600),
-                                                    ),
-                                                    Text(
-                                                      '${_formatCost(item['amount'])} ₺',
-                                                      style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: AppColors.gray900),
-                                                    ),
+                                                    Text(item['name']?.toString() ?? '', style: const TextStyle(fontSize: 12, color: AppColors.gray600)),
+                                                    Text('${_formatCost(item['amount'])} ₺', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: AppColors.gray900)),
                                                   ],
                                                 ),
                                               )),
@@ -1099,14 +1206,8 @@ class _JobLogCard extends StatelessWidget {
                                                 Row(
                                                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                                                   children: [
-                                                    Text(
-                                                      'KDV (%${(kdvRate as num?)?.toInt() ?? 0})',
-                                                      style: const TextStyle(fontSize: 11, color: AppColors.gray400),
-                                                    ),
-                                                    Text(
-                                                      '${_formatCost(kdvAmount)} ₺',
-                                                      style: const TextStyle(fontSize: 11, color: AppColors.gray500),
-                                                    ),
+                                                    Text('KDV (%${(kdvRate as num?)?.toInt() ?? 0})', style: const TextStyle(fontSize: 11, color: AppColors.gray400)),
+                                                    Text('${_formatCost(kdvAmount)} ₺', style: const TextStyle(fontSize: 11, color: AppColors.gray500)),
                                                   ],
                                                 ),
                                               ],
@@ -1115,13 +1216,65 @@ class _JobLogCard extends StatelessWidget {
                                                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                                                 children: [
                                                   const Text('Toplam', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: AppColors.gray700)),
-                                                  Text(
-                                                    '${_formatCost(costTotal)} ₺',
-                                                    style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w800, color: Color(0xFF15803D)),
-                                                  ),
+                                                  Text('${_formatCost(costTotal)} ₺', style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w800, color: Color(0xFF15803D))),
                                                 ],
                                               ),
                                             ],
+                                          ),
+                                        ),
+                                      ],
+                                      // Bütçe aşım nedeni
+                                      if (overBudgetReason != null) ...[
+                                        const SizedBox(height: 8),
+                                        Container(
+                                          padding: const EdgeInsets.all(10),
+                                          decoration: BoxDecoration(
+                                            color: const Color(0xFFFEF2F2),
+                                            borderRadius: BorderRadius.circular(8),
+                                            border: Border.all(color: const Color(0xFFFECACA)),
+                                          ),
+                                          child: Row(
+                                            crossAxisAlignment: CrossAxisAlignment.start,
+                                            children: [
+                                              const Icon(Icons.warning_amber_rounded, size: 14, color: Color(0xFFDC2626)),
+                                              const SizedBox(width: 6),
+                                              Expanded(
+                                                child: Column(
+                                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                                  children: [
+                                                    const Text('Bütçe Aşım Nedeni', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: Color(0xFFDC2626))),
+                                                    const SizedBox(height: 2),
+                                                    Text(overBudgetReason, style: const TextStyle(fontSize: 12, color: Color(0xFFDC2626), height: 1.4)),
+                                                  ],
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                        ),
+                                      ],
+                                      // Fotoğraflar
+                                      if (attachments.isNotEmpty) ...[
+                                        const SizedBox(height: 10),
+                                        SizedBox(
+                                          height: 90,
+                                          child: ListView.separated(
+                                            scrollDirection: Axis.horizontal,
+                                            itemCount: attachments.length,
+                                            separatorBuilder: (_, __) => const SizedBox(width: 8),
+                                            itemBuilder: (ctx, ai) => GestureDetector(
+                                              onTap: () => _showImageViewer(ctx, attachments, ai),
+                                              child: ClipRRect(
+                                                borderRadius: BorderRadius.circular(8),
+                                                child: CachedNetworkImage(
+                                                  imageUrl: attachments[ai],
+                                                  width: 90,
+                                                  height: 90,
+                                                  fit: BoxFit.cover,
+                                                  placeholder: (_, __) => Container(width: 90, height: 90, color: AppColors.gray100, child: const Icon(Icons.image_outlined, color: AppColors.gray300)),
+                                                  errorWidget: (_, __, ___) => Container(width: 90, height: 90, color: AppColors.gray100, child: const Icon(Icons.broken_image_outlined, color: AppColors.gray300)),
+                                                ),
+                                              ),
+                                            ),
                                           ),
                                         ),
                                       ],
@@ -1139,6 +1292,49 @@ class _JobLogCard extends StatelessWidget {
               ),
             ),
         ],
+      ),
+    );
+  }
+
+  Widget _buildCostLine(String label, double? value, {required String Function(dynamic) formatFn}) {
+    if (value == null || value <= 0) return const SizedBox.shrink();
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 4),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Text(label, style: const TextStyle(fontSize: 12, color: AppColors.gray600)),
+          Text('${formatFn(value)} ₺', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: AppColors.gray900)),
+        ],
+      ),
+    );
+  }
+
+  static void _showImageViewer(BuildContext context, List<String> urls, int initial) {
+    showDialog(
+      context: context,
+      builder: (_) => Dialog(
+        backgroundColor: Colors.black,
+        insetPadding: EdgeInsets.zero,
+        child: Stack(
+          children: [
+            PageView.builder(
+              controller: PageController(initialPage: initial),
+              itemCount: urls.length,
+              itemBuilder: (ctx, i) => InteractiveViewer(
+                child: CachedNetworkImage(imageUrl: urls[i], fit: BoxFit.contain),
+              ),
+            ),
+            Positioned(
+              top: 40,
+              right: 16,
+              child: IconButton(
+                onPressed: () => Navigator.pop(context),
+                icon: const Icon(Icons.close, color: Colors.white, size: 28),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -1985,6 +2181,8 @@ class _JobUpdateSheetState extends State<_JobUpdateSheet> {
   final _itemNameCtrl = TextEditingController();
   final _itemAmountCtrl = TextEditingController();
   bool _submitting = false;
+  final List<String> _uploadedUrls = [];
+  bool _uploading = false;
 
   static const _updateTypes = [
     ('progress', 'İlerleme'),
@@ -2020,6 +2218,22 @@ class _JobUpdateSheetState extends State<_JobUpdateSheet> {
     return true;
   }
 
+  Future<void> _pickAndUpload() async {
+    final picked = await ImagePicker().pickMultiImage(imageQuality: 85, maxWidth: 1920);
+    if (picked.isEmpty) return;
+    setState(() => _uploading = true);
+    try {
+      for (final img in picked) {
+        final bytes = await img.readAsBytes();
+        final mime = img.name.toLowerCase().endsWith('.png') ? 'image/png' : 'image/jpeg';
+        final result = await widget.notifier.uploadFile(bytes, img.name, mime);
+        if (result != null) setState(() => _uploadedUrls.add(result));
+      }
+    } finally {
+      if (mounted) setState(() => _uploading = false);
+    }
+  }
+
   Future<void> _submit() async {
     if (!_isValid) return;
     setState(() => _submitting = true);
@@ -2027,6 +2241,7 @@ class _JobUpdateSheetState extends State<_JobUpdateSheet> {
       'updateType': _updateType,
       'description': _descCtrl.text.trim(),
       if (_partsCtrl.text.trim().isNotEmpty) 'partsUsed': _partsCtrl.text.trim(),
+      if (_uploadedUrls.isNotEmpty) 'attachmentUrls': _uploadedUrls,
       if (_costItems.isNotEmpty) 'costItems': _costItems,
       if (_kdvRate > 0) 'kdvRate': _kdvRate,
       if (_kdvAmount > 0) 'kdvAmount': _kdvAmount,
@@ -2038,6 +2253,11 @@ class _JobUpdateSheetState extends State<_JobUpdateSheet> {
         Navigator.of(context).pop();
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('Güncelleme eklendi'), backgroundColor: Color(0xFF16A34A)),
+        );
+      } else {
+        final err = widget.notifier.lastError;
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(err ?? 'Bir hata oluştu'), backgroundColor: Colors.red),
         );
       }
     }
@@ -2122,6 +2342,15 @@ class _JobUpdateSheetState extends State<_JobUpdateSheet> {
                   const Text('Kullanılan Parçalar', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: AppColors.gray700)),
                   const SizedBox(height: 6),
                   TextField(controller: _partsCtrl, decoration: _inputDec('Opsiyonel...')),
+                  const SizedBox(height: 16),
+                  const Text('Fotoğraf Ekle', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: AppColors.gray700)),
+                  const SizedBox(height: 6),
+                  _PhotoUploadSection(
+                    urls: _uploadedUrls,
+                    uploading: _uploading,
+                    onPick: _pickAndUpload,
+                    onRemove: (i) => setState(() => _uploadedUrls.removeAt(i)),
+                  ),
                   const SizedBox(height: 16),
                   _CostItemsSection(
                     costItems: _costItems,
@@ -2243,6 +2472,8 @@ class _CompleteJobSheetState extends State<_CompleteJobSheet> {
   final _itemNameCtrl = TextEditingController();
   final _itemAmountCtrl = TextEditingController();
   bool _submitting = false;
+  final List<String> _uploadedUrls = [];
+  bool _uploading = false;
 
   static const _kdvOptions = [0.0, 10.0, 20.0];
 
@@ -2257,7 +2488,7 @@ class _CompleteJobSheetState extends State<_CompleteJobSheet> {
   }
 
   bool get _isValid {
-    if (_workDoneCtrl.text.trim().isEmpty) return false;
+    if (_workDoneCtrl.text.trim().length < 10) return false;
     if (_isOverBudget && _overBudgetCtrl.text.trim().isEmpty) return false;
     return true;
   }
@@ -2273,12 +2504,29 @@ class _CompleteJobSheetState extends State<_CompleteJobSheet> {
     });
   }
 
+  Future<void> _pickAndUpload() async {
+    final picked = await ImagePicker().pickMultiImage(imageQuality: 85, maxWidth: 1920);
+    if (picked.isEmpty) return;
+    setState(() => _uploading = true);
+    try {
+      for (final img in picked) {
+        final bytes = await img.readAsBytes();
+        final mime = img.name.toLowerCase().endsWith('.png') ? 'image/png' : 'image/jpeg';
+        final result = await widget.notifier.uploadFile(bytes, img.name, mime);
+        if (result != null) setState(() => _uploadedUrls.add(result));
+      }
+    } finally {
+      if (mounted) setState(() => _uploading = false);
+    }
+  }
+
   Future<void> _submit() async {
     if (!_isValid) return;
     setState(() => _submitting = true);
     final ok = await widget.notifier.completeJob(
       workDone: _workDoneCtrl.text.trim(),
       partsUsed: _partsCtrl.text.trim().isNotEmpty ? _partsCtrl.text.trim() : null,
+      attachmentUrls: _uploadedUrls.isNotEmpty ? _uploadedUrls : null,
       costItems: _costItems,
       kdvRate: _kdvRate > 0 ? _kdvRate : null,
       kdvAmount: _kdvAmount > 0 ? _kdvAmount : null,
@@ -2290,6 +2538,11 @@ class _CompleteJobSheetState extends State<_CompleteJobSheet> {
         Navigator.of(context).pop();
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('İş başarıyla tamamlandı'), backgroundColor: Color(0xFF16A34A)),
+        );
+      } else {
+        final err = widget.notifier.lastError;
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(err ?? 'Bir hata oluştu'), backgroundColor: Colors.red),
         );
       }
     }
@@ -2343,7 +2596,17 @@ class _CompleteJobSheetState extends State<_CompleteJobSheet> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Text('Yapılan İşler *', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: AppColors.gray700)),
+                  Row(
+                    children: [
+                      const Text('Yapılan İşler *', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: AppColors.gray700)),
+                      const Spacer(),
+                      if (_workDoneCtrl.text.trim().length < 10)
+                        Text(
+                          'En az 10 karakter (${_workDoneCtrl.text.trim().length}/10)',
+                          style: const TextStyle(fontSize: 11, color: AppColors.gray400),
+                        ),
+                    ],
+                  ),
                   const SizedBox(height: 6),
                   TextField(
                     controller: _workDoneCtrl,
@@ -2355,6 +2618,15 @@ class _CompleteJobSheetState extends State<_CompleteJobSheet> {
                   const Text('Kullanılan Parçalar', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: AppColors.gray700)),
                   const SizedBox(height: 6),
                   TextField(controller: _partsCtrl, decoration: _inputDec('Opsiyonel...')),
+                  const SizedBox(height: 16),
+                  const Text('Fotoğraf Ekle', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: AppColors.gray700)),
+                  const SizedBox(height: 6),
+                  _PhotoUploadSection(
+                    urls: _uploadedUrls,
+                    uploading: _uploading,
+                    onPick: _pickAndUpload,
+                    onRemove: (i) => setState(() => _uploadedUrls.removeAt(i)),
+                  ),
                   const SizedBox(height: 16),
                   _CostItemsSection(
                     costItems: _costItems,
@@ -2849,6 +3121,92 @@ class _InfoRequestSheetState extends State<_InfoRequestSheet> {
           ),
         ],
       ),
+    );
+  }
+}
+
+// ─── Photo Upload Section ─────────────────────────────────────────────────────
+
+class _PhotoUploadSection extends StatelessWidget {
+  final List<String> urls;
+  final bool uploading;
+  final VoidCallback onPick;
+  final void Function(int) onRemove;
+
+  const _PhotoUploadSection({
+    required this.urls,
+    required this.uploading,
+    required this.onPick,
+    required this.onRemove,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        GestureDetector(
+          onTap: uploading ? null : onPick,
+          child: Container(
+            width: double.infinity,
+            padding: const EdgeInsets.symmetric(vertical: 14),
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: AppColors.gray300),
+              color: AppColors.gray50,
+            ),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                uploading
+                    ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2, color: AppColors.blue600))
+                    : const Icon(Icons.add_photo_alternate_outlined, size: 18, color: AppColors.gray400),
+                const SizedBox(width: 8),
+                Text(
+                  uploading ? 'Yükleniyor...' : 'Galeriden fotoğraf seç',
+                  style: const TextStyle(fontSize: 13, color: AppColors.gray500),
+                ),
+              ],
+            ),
+          ),
+        ),
+        if (urls.isNotEmpty) ...[
+          const SizedBox(height: 10),
+          SizedBox(
+            height: 72,
+            child: ListView.separated(
+              scrollDirection: Axis.horizontal,
+              itemCount: urls.length,
+              separatorBuilder: (_, __) => const SizedBox(width: 8),
+              itemBuilder: (ctx, i) => Stack(
+                children: [
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(8),
+                    child: CachedNetworkImage(
+                      imageUrl: urls[i],
+                      width: 72, height: 72,
+                      fit: BoxFit.cover,
+                      placeholder: (_, __) => Container(width: 72, height: 72, color: AppColors.gray100),
+                      errorWidget: (_, __, ___) => Container(width: 72, height: 72, color: AppColors.gray100, child: const Icon(Icons.broken_image_outlined, color: AppColors.gray300)),
+                    ),
+                  ),
+                  Positioned(
+                    top: 2, right: 2,
+                    child: GestureDetector(
+                      onTap: () => onRemove(i),
+                      child: Container(
+                        width: 18, height: 18,
+                        decoration: const BoxDecoration(color: Colors.red, shape: BoxShape.circle),
+                        child: const Icon(Icons.close, size: 12, color: Colors.white),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ],
     );
   }
 }

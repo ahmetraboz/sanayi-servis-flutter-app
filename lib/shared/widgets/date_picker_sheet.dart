@@ -88,14 +88,17 @@ class _DatePickerSheetState extends State<DatePickerSheet> {
     return s.compareTo(f) >= 0 && s.compareTo(t) <= 0;
   }
 
-  void _prev() => setState(() {
-        if (_month == 0) {
-          _month = 11;
-          _year--;
-        } else {
-          _month--;
-        }
-      });
+  bool get _canGoPrev {
+    final now = DateTime.now();
+    return _year > now.year || (_year == now.year && _month > now.month - 1);
+  }
+
+  void _prev() {
+    if (!_canGoPrev) return;
+    setState(() {
+      if (_month == 0) { _month = 11; _year--; } else { _month--; }
+    });
+  }
 
   void _next() => setState(() {
         if (_month == 11) {
@@ -139,15 +142,15 @@ class _DatePickerSheetState extends State<DatePickerSheet> {
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               GestureDetector(
-                onTap: _prev,
+                onTap: _canGoPrev ? _prev : null,
                 child: Container(
                   width: 32,
                   height: 32,
                   decoration: BoxDecoration(
                       color: AppColors.gray100,
                       borderRadius: BorderRadius.circular(8)),
-                  child: const Icon(Icons.chevron_left,
-                      size: 20, color: AppColors.gray600),
+                  child: Icon(Icons.chevron_left,
+                      size: 20, color: _canGoPrev ? AppColors.gray600 : AppColors.gray300),
                 ),
               ),
               Text('${_months[_month]} $_year',
@@ -193,12 +196,15 @@ class _DatePickerSheetState extends State<DatePickerSheet> {
               final isSelected = cell.str == selected;
               final isToday = cell.str == today;
               final inRange = _inRange(cell.str);
+              final isPast = cell.str.compareTo(today) < 0;
 
               Color bg = Colors.transparent;
-              Color fg = AppColors.gray700;
+              Color fg = isPast ? AppColors.gray300 : AppColors.gray700;
               BoxBorder? border;
 
-              if (isSelected) {
+              if (isPast) {
+                // geçmiş — devre dışı
+              } else if (isSelected) {
                 bg = AppColors.blue600;
                 fg = Colors.white;
               } else if (inRange) {
@@ -210,7 +216,7 @@ class _DatePickerSheetState extends State<DatePickerSheet> {
               }
 
               return GestureDetector(
-                onTap: () {
+                onTap: isPast ? null : () {
                   widget.onSelected(cell.str);
                   Navigator.pop(context);
                 },

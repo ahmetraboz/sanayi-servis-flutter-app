@@ -1,3 +1,4 @@
+import 'dart:typed_data';
 import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/api/api_client.dart';
@@ -209,9 +210,24 @@ class ProviderRequestDetailNotifier extends StateNotifier<ProviderRequestDetailS
     }
   }
 
+  String? get lastError => state.actionError;
+
+  Future<String?> uploadFile(Uint8List bytes, String filename, String mimeType) async {
+    try {
+      final formData = FormData.fromMap({
+        'file': MultipartFile.fromBytes(bytes, filename: filename, contentType: DioMediaType.parse(mimeType)),
+      });
+      final res = await _api.post('/api/upload', data: formData);
+      return (res.data as Map<String, dynamic>)['url'] as String?;
+    } catch (_) {
+      return null;
+    }
+  }
+
   Future<bool> completeJob({
     required String workDone,
     String? partsUsed,
+    List<String>? attachmentUrls,
     List<Map<String, dynamic>> costItems = const [],
     double? kdvRate,
     double? kdvAmount,
@@ -222,6 +238,7 @@ class ProviderRequestDetailNotifier extends StateNotifier<ProviderRequestDetailS
       await _api.post('/api/provider/requests/$requestId/complete', data: {
         'workDone': workDone,
         if (partsUsed != null && partsUsed.isNotEmpty) 'partsUsed': partsUsed,
+        if (attachmentUrls != null && attachmentUrls.isNotEmpty) 'attachmentUrls': attachmentUrls,
         if (costItems.isNotEmpty) 'costItems': costItems,
         if (kdvRate != null) 'kdvRate': kdvRate,
         if (kdvAmount != null) 'kdvAmount': kdvAmount,
